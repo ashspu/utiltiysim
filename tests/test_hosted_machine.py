@@ -4,6 +4,7 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,7 +18,7 @@ from test_world_field_execution import receipt as field_receipt
 from test_world_water_faults import command as leak_command
 
 from utilsim.hosted.server import create_app
-from utilsim.world import customer_finance, water_faults
+from utilsim.world import customer_finance, field_execution, water_faults
 from utilsim.world.store import canonical, stable
 
 MACHINE_KEY = 'test-machine-key-distinct-from-browser-credential'
@@ -176,6 +177,12 @@ def test_field_actual_repair_dispatch_receipt_before_report_and_separate_db(setu
         command.pop('actorId')
         response = client.post(prefix + '/returns/field', json=command, headers=auth)
         assert response.status_code == 200, response.text
+    status = client.get(prefix + '/field-managed/status', headers=auth)
+    assert status.status_code == 200 and status.json()['fieldOwnerId'] == field.owner_id
+    assert status.json()['enabled'] is False
+    proof = client.get(prefix + '/field-managed/assignment', params={'assignmentId': 'A1'}, headers=auth)
+    assert proof.status_code == 200
+    assert field_execution.checksum(proof.json()['assignment']) == proof.json()['checksum']
     assert advance(client, identity, auth).status_code == 200
     page = client.get(prefix + '/feeds/field', headers=auth).json()
     assert len(page['items']) == 1 and page['items'][0]['envelope']['schema'] == 'field-ack/1'
@@ -187,6 +194,49 @@ def test_field_actual_repair_dispatch_receipt_before_report_and_separate_db(setu
     with physical.read_db() as db:
         assert db.execute("SELECT COUNT(*) FROM events WHERE type='PhysicalWaterLeakRepaired'").fetchone()[0] == 1
         assert not db.execute("SELECT name FROM sqlite_master WHERE name LIKE 'field_%'").fetchall()
+
+
+def test_initial_connection_recovers_empty_uncommitted_field_after_process_loss(setup, monkeypatch):
+    app, client, world = instance(setup)
+    port = app.state.library.machine
+    command = {'commandId': str(uuid.uuid4()), 'expectedRevision': 0,
+               'controllerId': 'utilitysim-controller', 'sewerReturnFactor': '0.9', 'delaySeconds': 21600}
+    def interrupted_field(_world, identity):
+        path = setup[0] / 'worlds' / identity / 'machine-field.sqlite'
+        assert path.resolve().is_relative_to(setup[0].resolve())
+        path.write_bytes(b'')
+        raise OSError('Lost process before first field transaction committed.')
+    monkeypatch.setattr(port, 'field', interrupted_field)
+    endpoint = f"/hosted/worlds/{world['id']}/connection"
+    assert client.post(endpoint, json=command, headers=headers()).status_code == 503
+    restarted = TestClient(create_app(setup[0], TOKEN, MACHINE_KEY))
+    assert restarted.post(endpoint, json={**command, 'commandId': str(uuid.uuid4())}, headers=headers()).status_code == 422
+    recovered = restarted.post(endpoint, json=command, headers=headers())
+    assert recovered.status_code == 200 and recovered.json()['active'] is True
+    assert restarted.post(endpoint, json=command, headers=headers()).json() == recovered.json()
+
+
+def test_registered_field_reads_refuse_missing_or_empty_owner_without_replacement(setup):
+    app, client, world = instance(setup)
+    _, _, auth = connect(client, world['id'])
+    field = app.state.library.machine.field_existing(app.state.library.machine.world({'world': world['id']}), world['id'])
+    path = Path(field.path)
+    saved = path.with_name('saved-field.sqlite')
+    assert path.resolve().is_relative_to(setup[0].resolve()) and saved.resolve().is_relative_to(setup[0].resolve())
+    endpoint = f"/machine/worlds/{world['id']}/field-managed/status"
+    assignment_endpoint = f"/machine/worlds/{world['id']}/field-managed/assignment"
+    assert client.get(assignment_endpoint, params={'assignmentId': 'absent'}, headers=auth).status_code == 404
+    path.rename(saved)
+    try:
+        assert client.get(assignment_endpoint, params={'assignmentId': 'absent'}, headers=auth).status_code == 503
+        assert client.get(endpoint, headers=auth).status_code == 503
+        assert not path.exists()
+        path.write_bytes(b'')
+        assert client.get(endpoint, headers=auth).status_code == 422
+        path.unlink()
+    finally:
+        saved.rename(path)
+    assert client.get(endpoint, headers=auth).status_code == 200
 
 
 def test_unconfigured_controller_is_truthful_and_no_machine_metadata_in_browser_status(setup):

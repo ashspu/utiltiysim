@@ -14,6 +14,15 @@ from fastapi.responses import JSONResponse
 from utilsim.world.store import canonical
 
 from .machine import MAX_RESPONSE
+from .managed_field import (
+    AUTHORITY_FIELDS,
+    AUTHORITY_PATH,
+    CALENDAR_FIELDS,
+    CALENDAR_PATH,
+    ManagedFieldBridge,
+    field_assignment,
+    field_status,
+)
 
 
 class ControllerCommandRejected(Exception):
@@ -86,6 +95,10 @@ class ControllerProxy:
             allowed = {'schemaVersion', 'runId', 'controllerId', 'physicalThrough', 'clock', 'phase',
                        'revision', 'target', 'activeCommandId', 'technicalError', 'errorJobId', 'counts',
                        'supportedActions', 'lastCommand', 'commandId', 'status', 'action', 'through', 'billingAfter'}
+            if path == AUTHORITY_PATH:
+                allowed = AUTHORITY_FIELDS
+            elif path == CALENDAR_PATH:
+                allowed = CALENDAR_FIELDS
             if set(result) - allowed:
                 raise ValueError('Unexpected controller response fields.')
             return result
@@ -167,6 +180,18 @@ def install(app, port, owned, body, controller_url=None, controller_token=None, 
     @app.get('/machine/worlds/{identity}/status')
     def machine_status(identity: str, request: Request):
         return port.status(request.state.connection)
+
+    @app.post('/machine/worlds/{identity}/field-managed/{action}')
+    def managed_field(identity: str, action: str, request: Request, value: dict = Depends(body)):
+        return ManagedFieldBridge(port, request.state.connection, proxy).command(action, value)
+
+    @app.get('/machine/worlds/{identity}/field-managed/status')
+    def managed_field_status(identity: str, request: Request):
+        return field_status(port, request.state.connection)
+
+    @app.get('/machine/worlds/{identity}/field-managed/assignment')
+    def managed_field_assignment(identity: str, request: Request, assignmentId: str):
+        return field_assignment(port, request.state.connection, assignmentId)
 
     @app.post('/machine/worlds/{identity}/advance')
     def machine_advance(identity: str, request: Request, value: dict = Depends(body)):
