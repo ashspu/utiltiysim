@@ -1,9 +1,13 @@
 # Hosted shell authentication
 
-The production root is the UtilitySim landing page. It lists the versioned town
-library and never chooses a remembered or default map. Explicit `/?town=...`
-links retain their town, premise and page after sign-in. `/library.html?town=...`
-opens the selected workspace. The desktop launcher remains independently usable.
+The production root is the UtilitySim introduction: the approved utility icon,
+river-town artwork, four illustrated scroll chapters and one WorkOS Log in link.
+It has no public world catalog, navigation header or other application actions.
+Login enters `/workspace.html`, where the authenticated user explicitly chooses
+an authorized town. It never chooses a remembered or default map. Explicit
+`/?town=...` links retain their town, premise and page after sign-in.
+`/library.html?town=...` opens the selected workspace. The desktop launcher
+remains independently usable.
 
 ## Identity and permissions
 
@@ -40,8 +44,14 @@ The `/atlas/api/*` gateway checks the verified WorkOS identity, capability and
 town before calling the runtime. Unknown routes are denied. It forwards only to
 the configured HTTPS runtime, with the server-only `UTILITYSIM_RUNTIME_TOKEN`.
 The runtime must enforce its bearer token and independently validate its internal
-town ID. Public static town artwork is a preview, not protected billing data.
-Do not place secrets or customer data in static map assets.
+town ID. Routing Middleware (`proxy.js`, `server/page-access.mjs`) separately
+validates the WorkOS session before serving static workspace, viewer, catalog,
+map and tile requests. Town-specific resources require a current verified-email
+grant for that town. Missing/forged sessions, absent grants and wrong-town grants
+cannot unlock the files by bypassing the client. Authorized responses are private
+and not cached. The root and its exact introduction assets remain public.
+The workspace chooser can show an authenticated account awaiting access; it does
+not expose maps to that account. API permissions remain independently enforced.
 
 ## Environment setup
 

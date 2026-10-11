@@ -34,6 +34,18 @@ test('forged state is rejected without exchanging a code',async()=>{
   await handler({method:'GET',url:'/api/auth/callback?code=bad&state=wrong',headers:{cookie:start.headers['Set-Cookie'][0].split(';')[0]}},res);
   assert.equal(res.statusCode,400);assert.equal(calls.length,1);
 });
+test('default login returns to the authenticated world chooser',async()=>{
+  const {handler,calls}=fixture(), start=response();
+  await handler({method:'GET',url:'/api/auth/login',headers:{}},start);
+  const done=response();
+  await handler({method:'GET',url:'/api/auth/callback?code=single-use&state='+calls[0].state,headers:{cookie:start.headers['Set-Cookie'][0].split(';')[0]}},done);
+  assert.equal(done.headers.Location,'/workspace.html');
+});
+test('an existing valid session enters through login without choosing a map',async()=>{
+  const {handler,calls}=fixture(), res=response();
+  await handler({method:'GET',url:'/api/auth/login',headers:{cookie:'utilitysim-session=valid'}},res);
+  assert.equal(res.headers.Location,'/workspace.html');assert.equal(calls.length,0);
+});
 test('session response never returns tokens and is not cached',async()=>{
   const {handler}=fixture(), res=response();
   await handler({method:'GET',url:'/api/auth/session',headers:{cookie:'utilitysim-session=test'}},res);

@@ -29,7 +29,7 @@ export function setCookie(res, name, value, cfg, age = 604800) {
 export function safeReturn(value) {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || /[\\\r\n]/.test(value)) return '/';
   const url = new URL(value, 'https://utilitysim.invalid');
-  if (!['/', '/library.html'].includes(url.pathname)) return '/';
+  if (!['/', '/workspace.html', '/library.html'].includes(url.pathname)) return '/';
   return url.pathname + url.search + url.hash;
 }
 export function sameOrigin(req, cfg) { return req.headers.origin === cfg.origin; }
@@ -66,9 +66,13 @@ export function createAuthHandler({ env = process.env, client = cfg => new WorkO
       const action = url.pathname.split('/').at(-1);
       const workos = client(cfg);
       if (action === 'login' && req.method === 'GET') {
+        const returnTo = safeReturn(url.searchParams.get('returnTo') || '/workspace.html');
+        // Existing valid sessions enter the workspace through the same login
+        // endpoint, without creating another identity or selecting a town.
+        if (await identity(req, res, cfg, workos)) return redirect(res, returnTo);
         const nonce = randomBytes(32).toString('base64url');
         const verifier = randomBytes(32).toString('base64url');
-        const state = await sealData({ nonce, verifier, returnTo: safeReturn(url.searchParams.get('returnTo')) }, { password: cfg.password, ttl: 600 });
+        const state = await sealData({ nonce, verifier, returnTo }, { password: cfg.password, ttl: 600 });
         setCookie(res, 'utilitysim-login', state, cfg, 600);
         return redirect(res, workos.userManagement.getAuthorizationUrl({ provider: 'authkit', clientId: cfg.clientId,
           redirectUri: cfg.callback, state: nonce, codeChallenge: createHash('sha256').update(verifier).digest('base64url'), codeChallengeMethod: 'S256' }));

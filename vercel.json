@@ -5,6 +5,7 @@
   "buildCommand": "node scripts/build_site.mjs",
   "outputDirectory": "public",
   "cleanUrls": false,
+  "proxy": { "entrypoint": "proxy.js" },
   "rewrites": [{ "source": "/atlas/api/:path*", "destination": "/api/runtime?path=:path*" }],
   "headers": [{ "source": "/api/:path*", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] }]
 }

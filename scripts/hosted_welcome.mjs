@@ -1,30 +1,25 @@
-// Keep the agreed Civic Atlas welcome as the visual source of truth. Only its
-// account and world-entry controls differ between the local and hosted shells.
+// Preserve the agreed river artwork and illustrated story. The public surface
+// has one application action: WorkOS login. World selection lives behind auth.
 export function hostedWelcome(source) {
   const start = source.indexOf('<section id="welcome-page"');
   const end = source.indexOf('<section id="map-page"', start);
-  if (start < 0 || end < 0) throw new Error('Civic Atlas welcome section is missing');
+  if (start < 0 || end < 0) throw new Error('UtilitySim welcome section is missing');
   let welcome = source.slice(start, end);
   function replace(pattern, value) {
     if (!pattern.test(welcome)) throw new Error(`Welcome integration needs review: ${pattern}`);
     welcome = welcome.replace(pattern, value);
   }
-  replace(/<div id="welcome-account-panel"[\s\S]*?<\/div>/, `<div id="welcome-account-panel" class="welcome-account-panel" hidden>
-    <span class="eyebrow">YOUR WORKSPACE</span><strong id="account-name">Welcome to UtilitySim</strong>
-    <p id="account-status" role="status">Sign in to open your workspace.</p>
-    <button data-page="overview">Choose a world <span>→</span></button>
-    <a id="sign-in" href="/api/auth/login">Sign in <span>→</span></a>
-    <button id="sign-out" hidden>Sign out <span>→</span></button>
-    <a href="/download/">Get the desktop app <span>↗</span></a>
-  </div>`);
+  replace(/<header class="welcome-masthead">[\s\S]*?<\/header>/, '');
   replace(/<dialog id="welcome-sign-in-dialog"[\s\S]*?<\/dialog>/, '');
-  replace(/Resume Brookfield/, 'Choose a world');
-  replace(/Resume world/, 'Explore worlds');
-  replace(/<section class="saved-world-section">[\s\S]*?<\/section>/, `<section id="welcome-worlds" class="saved-world-section" aria-labelledby="worlds-title">
-    <div class="section-heading"><div><span class="eyebrow">A WORLD READY TO EXPLORE</span><h2 id="worlds-title">Find your place.</h2></div><p id="worlds-guidance" role="status">Choose a town to open its workspace.</p></div>
-    <div id="worlds" class="worlds"><p>Loading town library…</p></div>
-  </section>
-  <footer class="welcome-footer"><span>UtilitySim v2 · Civic Atlas</span><a href="/download/">Get the desktop app →</a></footer>`);
+  replace(/<section class="saved-world-section">[\s\S]*?<\/section>/, '');
+  replace(/<div class="welcome-hero">/, `<div class="welcome-hero"><div class="hero-brand"><img src="/brand/utility-studio-icon-color.svg" alt="" width="64" height="64"><span>UtilitySim</span></div>`);
+  replace(/<div class="welcome-actions">[\s\S]*?<\/div>/, '<div class="welcome-actions"><a id="sign-in" class="primary big" href="/api/auth/login?returnTo=%2Fworkspace.html">Log in <span aria-hidden="true">→</span></a></div>');
+  // Informational ecosystem cards and chapters remain; they do not open apps.
+  welcome = welcome.replace(/<button class="text-button" data-page="[^"]+">[\s\S]*?<\/button>/g, '');
+  welcome = welcome.replace(/<button data-page="connections">([\s\S]*?)<b>→<\/b><\/button>/g, '<div class="welcome-connection-card">$1</div>');
+  welcome = welcome.replace(/<button data-story-jump="(\d)"[^>]*>([\s\S]*?)<\/button>/g, '<span data-story-step="$1">$2</span>');
+  welcome = welcome.replace(/Civic Atlas/g, 'UtilitySim');
+  if (/data-page=|data-scroll-target=|<button\b/.test(welcome)) throw new Error('Public welcome contains an unexpected action');
   // The same icon shapes used in app.js, without booting the world or WebGL.
   const icons = {
     map: 'm3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2z M9 3v16 M15 5v16',
@@ -39,7 +34,7 @@ export function hostedWelcome(source) {
   });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#112e3f"><title>Civic Atlas · UtilitySim v2</title>
+<meta name="theme-color" content="#112e3f"><title>UtilitySim</title>
 <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/welcome.css"><link rel="stylesheet" href="/landing.css"></head>
 <body data-view="welcome"><main>${welcome}</main><script type="module" src="/welcome.js"></script><script type="module" src="/landing.js"></script></body></html>`;
 }

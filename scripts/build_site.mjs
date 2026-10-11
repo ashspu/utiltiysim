@@ -11,6 +11,7 @@ const catalog = JSON.parse(fs.readFileSync(path.join(web, 'presets/catalog.json'
 const townIds = new Set(catalog.presets.map(p => p.id));
 const presetFiles = new Set(['tiles.json', 'premise-index.json', 'landmarks.json', 'overview.webp', 'overview.json', 'geometry-overview.webp']);
 const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js', 'landing.js', 'landing.css', 'shell-session.js', 'style.css', 'welcome.css', 'welcome.js']);
+for (const file of ['workspace.html','workspace.js','workspace.css']) shellFiles.add(file);
 const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
 const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
 for (const asset of welcomeAssets) {
@@ -52,9 +53,11 @@ fs.cpSync(web, out, {recursive: true, filter(source) {
 }});
 fs.writeFileSync(path.join(out, 'index.html'), welcomeHtml);
 // Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.
-for (const file of ['index.html', 'library.html']) {
+for (const file of ['index.html', 'library.html', 'workspace.html']) {
   const target = path.join(out, file);
-  fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replace('<head>', '<head><meta name="utilitysim-hosted" content="true">'));
+  let html = fs.readFileSync(target, 'utf8').replace('<head>', '<head><meta name="utilitysim-hosted" content="true">');
+  if (file === 'library.html') html = html.replace('class="brand" href="/"', 'class="brand" href="/workspace.html"');
+  fs.writeFileSync(target, html);
 }
 fs.cpSync(path.join(repo, 'site'), path.join(out, 'download'), {recursive: true});
 fs.cpSync(path.join(repo, 'packages/town-viewer/dist/brand'), path.join(out, 'brand'), {recursive: true});

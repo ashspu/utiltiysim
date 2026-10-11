@@ -1,21 +1,15 @@
-/* Hosted controls extend the shared Civic Atlas welcome. */
-.welcome-account-panel>a{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #e8eeeb;font-size:12px;text-decoration:none;color:inherit}
-.welcome-account-panel strong,.welcome-account-panel p{overflow-wrap:anywhere}
-.welcome-account-panel button[hidden]{display:none}
-#welcome-worlds{scroll-margin-top:30px}
-#welcome-worlds .section-heading{margin-bottom:24px;gap:24px}
-#welcome-worlds h2{font:30px Georgia;margin-top:10px}
-.worlds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.world{display:flex;flex-direction:column;background:#fff;border:1px solid #dce5e6;border-radius:10px;overflow:hidden}
-.world>img{width:100%;height:190px;object-fit:cover;background:#e3ebdc;border-bottom:1px solid #e1e7e5}
-.world-body{padding:24px;display:flex;flex-direction:column;align-items:flex-start;flex:1}
-.world h3{font:25px Georgia;color:#163851;margin:8px 0 10px}
-.world p{font-size:13px;color:#617a7d;line-height:1.75;margin:0 0 22px;flex:1}
-.world .count{font-size:9px;letter-spacing:1.1px;color:#62817c;line-height:1.6}
-.world a{font-size:12px;color:#087b87;text-decoration:none;padding:10px 0;display:flex;gap:24px;align-items:center}
-.world a:hover{text-decoration:underline}
-.welcome-footer{display:flex;justify-content:space-between;gap:20px;padding-top:26px;margin-top:36px;border-top:1px solid #e1e7e5;font-size:11px;color:#627a7d}
-.welcome-footer a{color:inherit;text-decoration:none}
+/* The approved utility icon and UtilitySim name are part of the hero itself. */
+body[data-view="welcome"] #welcome-page{padding-top:24px}
+#welcome-page .welcome-hero{height:780px}
+.hero-brand{position:absolute;top:34px;left:56px;display:flex;align-items:center;gap:14px;color:#10344c}
+.hero-brand img{width:64px;height:64px;object-fit:contain}
+.hero-brand span{font-size:34px;font-weight:750;letter-spacing:-1.3px}
+#welcome-page .welcome-copy{padding-top:140px}
+#welcome-page .welcome-actions a{display:inline-flex;align-items:center;justify-content:center;gap:25px;text-decoration:none;border-radius:6px;color:white}
+.welcome-connection-card{display:flex;align-items:center;padding:15px 17px;background:white;border:1px solid #e5eaee;border-radius:7px;gap:13px;text-align:left}
+#welcome-page .welcome-story-progress>span{border-top:2px solid #dce6df;padding:12px 0;display:flex;align-items:center;gap:8px;font-size:10px;color:#667b7b}
+#welcome-page .welcome-story-progress>span b{font-size:10px;font-weight:500;color:#8da197}
+#welcome-page .welcome-story-progress>span[aria-current="step"]{border-color:#008997;color:#087686}
 a:focus-visible,button:focus-visible{outline:3px solid #008697;outline-offset:4px}
-@media(max-width:1150px){.worlds{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.worlds{grid-template-columns:1fr;gap:16px}.world>img{height:180px}#welcome-worlds .section-heading{display:block}#welcome-worlds .section-heading p{display:block;margin-top:12px}.welcome-ecosystem{grid-template-columns:1fr;gap:24px}.welcome-footer{flex-wrap:wrap}.world-body{padding:21px}}
+@media(max-width:1150px){.hero-brand{left:36px}.welcome-connection-card{padding:13px;gap:9px}}
+@media(max-width:760px){body[data-view="welcome"] #welcome-page{padding-top:16px}#welcome-page .welcome-hero{height:880px}.hero-brand{top:28px;left:25px;gap:12px}.hero-brand img{width:48px;height:48px}.hero-brand span{font-size:29px}#welcome-page .welcome-copy{padding-top:113px}.welcome-connection-card{padding:10px 13px}#welcome-page .welcome-ecosystem{grid-template-columns:1fr;gap:24px}}
