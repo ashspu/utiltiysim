@@ -150,6 +150,37 @@ def intervals(db, meta, start, end):
         'SELECT r.* FROM physical_read_intervals r JOIN observations o ON o.id=r.observation WHERE o.day>=? AND o.day<?', (start, end))}
 
 
+def summary(db, meta):
+    """Aggregate pinned assignments without configuring or reading device measures.
+
+    The caller supplies a read-only connection. Legacy worlds have no profile
+    tables; metadata absence must return before querying them.
+    """
+    result = {'enabled': False, 'modelVersion': meta.get('physicalProfileModelVersion'),
+              'configurationDigest': meta.get('physicalProfileConfigurationDigest'),
+              'meterChannelsEnabled': False, 'housingAgeEnabled': False, 'meterCounts': {},
+              'housing': {'count': 0, 'minAgeYears': None, 'maxAgeYears': None,
+                          'meanAgeYears': None, 'retrofittedCount': 0, 'retrofittedPercent': 0}}
+    if 'physicalProfileModelVersion' not in meta:
+        return result
+    if meta['physicalProfileModelVersion'] != VERSION:
+        raise ValueError('Unsupported physical profile model.')
+    configuration = meta['physicalProfileConfiguration']
+    result['meterChannelsEnabled'] = configuration['meterChannels']['enabled']
+    result['housingAgeEnabled'] = configuration['housingAge']['enabled']
+    result['enabled'] = result['meterChannelsEnabled'] or result['housingAgeEnabled']
+    if result['meterChannelsEnabled']:
+        result['meterCounts'] = {row['technology']: row['n'] for row in db.execute(
+            'SELECT technology,COUNT(*) n FROM physical_meter_profiles GROUP BY technology')}
+    if result['housingAgeEnabled']:
+        row = db.execute('SELECT COUNT(*) n,MIN(age_years) minimum,MAX(age_years) maximum,'
+                         'AVG(age_years) mean,SUM(retrofitted) retrofits FROM physical_housing_profiles').fetchone()
+        result['housing'] = {'count': row['n'], 'minAgeYears': row['minimum'], 'maxAgeYears': row['maximum'],
+                             'meanAgeYears': row['mean'], 'retrofittedCount': row['retrofits'] or 0,
+                             'retrofittedPercent': 100 * (row['retrofits'] or 0) / row['n'] if row['n'] else 0}
+    return result
+
+
 def inspect(world, premise=None):
     with world.read_db() as db:
         meta = world.metadata(db)

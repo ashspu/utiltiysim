@@ -11,7 +11,7 @@ from pathlib import Path
 from utilsim.config.wizard import world_configuration
 from utilsim.worker import world_creation
 from utilsim.worker.worlds import WorldLibrary
-from utilsim.world import cruise, sentiment, storms
+from utilsim.world import cruise, physical_profiles, sentiment, storms
 from utilsim.world.map_view import WorldMap
 from utilsim.world.store import MODEL_VERSION, World, canonical
 
@@ -194,7 +194,9 @@ class HostedLibrary:
             world = self.library.world(row['id'])
             result.update(WorldMap(world).status(), available=True)
             with world.read_db() as db:
-                result['fingerprint'] = world.metadata(db)['fingerprint']
+                meta = world.metadata(db)
+                result['fingerprint'] = meta['fingerprint']
+                result['physicalProfiles'] = physical_profiles.summary(db, meta)
         except (OSError, sqlite3.Error, KeyError, ValueError):
             result.update(available=False, error='Saved world is pending or unavailable. Retry its original creation command or restore its volume.')
         if result['initialization']['state'] != 'complete':
