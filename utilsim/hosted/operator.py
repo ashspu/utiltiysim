@@ -3,7 +3,9 @@
 Billing owns account mapping, clock/lease checks and atomic command receipts.
 This boundary supplies trusted identity and never infers business completion.
 """
+import hashlib
 import json
+import re
 import uuid
 
 from fastapi import Depends, HTTPException, Request
@@ -30,6 +32,32 @@ JOB_FIELDS = {'id', 'instance_id', 'type', 'cycle_id', 'parameters', 'parent_job
 ENVELOPE = {'schemaVersion', 'runId', 'controllerId', 'premiseId', 'action'}
 MAX_REQUEST = 4096
 MAX_RESPONSE = 2_000_000
+PERMANENT_STATUS = {'release-read': 404, 'invoice': 403, 'retry-job': 403}
+
+
+def browser_request_hash(value):
+    """Hash the unchanged typed browser body using well-formed JS JSON strings.
+
+    Request keys are ASCII and values are strings. JS keeps Unicode characters
+    but escapes lone UTF-16 surrogates; private canonical JSON escapes all Unicode.
+    """
+    encoded = json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
+    encoded = re.sub(r'[\ud800-\udfff]', lambda match: f'\\u{ord(match[0]):04x}', encoded)
+    return hashlib.sha256(encoded.encode('utf-8')).hexdigest()
+
+
+def permanent_rejection(status, proof, value, trusted_request):
+    if (not isinstance(proof, dict)
+            or set(proof) != {'commandId', 'requestHash', 'status', 'disposition'}
+            or PERMANENT_STATUS.get(value['action']) != status
+            or type(proof['status']) is not int or proof['status'] != status
+            or proof['commandId'] != value.get('commandId')
+            or proof['disposition'] != 'permanently-rejected'
+            or not isinstance(proof['requestHash'], str) or len(proof['requestHash']) != 64
+            or any(char not in '0123456789abcdef' for char in proof['requestHash'])
+            or proof['requestHash'] != hashlib.sha256(canonical(trusted_request).encode()).hexdigest()):
+        raise ValueError('Permanent operator refusal was not proved for the exact trusted request.')
+    return {**proof, 'requestHash': browser_request_hash(value)}
 
 
 def text(value):
@@ -52,15 +80,18 @@ def validate(value):
     return action
 
 
-def projection(status, result, connection, value):
+def projection(status, result, connection, value, trusted_request):
     if (not isinstance(result, dict) or result.get('schemaVersion') != RESPONSE_VERSION
             or result.get('runId') != connection['environment']
             or result.get('controllerId') != connection['controller']
             or result.get('premiseId') != value['premiseId'] or result.get('action') != value['action']):
         raise ValueError('Operator response scope mismatch.')
     if status in (400, 403, 404, 409, 413, 422, 503):
-        if set(result) != ENVELOPE | {'error'} or not text(result['error']):
+        extra = {'rejection'} if 'rejection' in result else set()
+        if set(result) != ENVELOPE | {'error'} | extra or not text(result['error']):
             raise ValueError('Invalid operator refusal.')
+        if extra:
+            result = {**result, 'rejection': permanent_rejection(status, result['rejection'], value, trusted_request)}
         return JSONResponse(result, status_code=status)
     action = value['action']
     expected = 202 if action in ('bill', 'invoice', 'retry-job') else 200
@@ -69,12 +100,20 @@ def projection(status, result, connection, value):
         raise ValueError('Invalid operator receipt.')
     record = result['result']
     if action == 'premise':
-        if set(record) != COLLECTIONS | {'physicalPremiseId'} or record['physicalPremiseId'] != value['premiseId']:
+        extra = {'invoiceEligibleAccountIds'} if 'invoiceEligibleAccountIds' in record else set()
+        if set(record) != COLLECTIONS | {'physicalPremiseId'} | extra or record['physicalPremiseId'] != value['premiseId']:
             raise ValueError('Unexpected operator premise projection.')
         for key in COLLECTIONS:
             if (not isinstance(record[key], list) or len(record[key]) > 200
                     or any(not isinstance(row, dict) for row in record[key])):
                 raise ValueError('Unbounded operator collection.')
+        eligible = record.get('invoiceEligibleAccountIds', [])
+        accounts = [row.get('id') for row in record['accounts']]
+        if (any(not text(account) for account in accounts) or not isinstance(eligible, list)
+                or len(eligible) > 200 or any(not text(account) for account in eligible)
+                or len(set(eligible)) != len(eligible) or not set(eligible) <= set(accounts)):
+            raise ValueError('Invoice eligibility must name only distinct bounded scoped accounts.')
+        result = {**result, 'result': {**record, 'invoiceEligibleAccountIds': eligible}}
     elif action == 'release-read':
         if (set(record) - {'status', 'replayed'} or record.get('status') != 'resolved'
                 or 'replayed' in record and type(record['replayed']) is not bool):
@@ -120,4 +159,4 @@ def install(app, port, owned, body, permits, controller_url, token, allow_http):
         if len(canonical(command).encode()) > MAX_REQUEST:
             raise HTTPException(413, 'Operator request exceeds 4 KiB.')
         return proxy.call(connection, PATH, command, max_response=MAX_RESPONSE,
-                          project=lambda status, result: projection(status, result, connection, value))
+                          project=lambda status, result: projection(status, result, connection, value, command))
