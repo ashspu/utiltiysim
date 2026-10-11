@@ -3,13 +3,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {hostedWelcome} from './hosted_welcome.mjs';
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const out = path.join(repo, 'public');
 const web = path.join(repo, 'prototypes/civic-atlas/web');
 const catalog = JSON.parse(fs.readFileSync(path.join(web, 'presets/catalog.json'), 'utf8'));
 const townIds = new Set(catalog.presets.map(p => p.id));
 const presetFiles = new Set(['tiles.json', 'premise-index.json', 'landmarks.json', 'overview.webp', 'overview.json', 'geometry-overview.webp']);
-const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js', 'landing.html', 'landing.js', 'landing.css', 'shell-session.js']);
+const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js', 'landing.js', 'landing.css', 'shell-session.js', 'style.css', 'welcome.css', 'welcome.js']);
+const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
+const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
+for (const asset of welcomeAssets) {
+  if (!fs.existsSync(path.join(web, 'assets', asset))) throw new Error(`Missing welcome art: ${asset}`);
+}
 if (!fs.existsSync(path.join(web, 'library.html'))) throw new Error('Town-library shell is not built.');
 for (const town of catalog.presets) {
   const folder = path.join(web, 'presets', town.id);
@@ -38,12 +44,13 @@ fs.mkdirSync(out, {recursive: true});
 fs.cpSync(web, out, {recursive: true, filter(source) {
   const relative = path.relative(web, source).split(path.sep);
   if (!relative[0]) return true;
+  if (relative[0] === 'assets') return relative.length === 1 || (relative.length === 2 && welcomeAssets.has(relative[1]));
   if (relative[0] !== 'presets') return relative.length === 1 && shellFiles.has(relative[0]);
   if (relative.length === 1 || relative[1] === 'catalog.json' || relative[1] === 'shared') return true;
   if (!townIds.has(relative[1])) return false;
   return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]);
 }});
-fs.copyFileSync(path.join(web, 'landing.html'), path.join(out, 'index.html'));
+fs.writeFileSync(path.join(out, 'index.html'), welcomeHtml);
 // Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.
 for (const file of ['index.html', 'library.html']) {
   const target = path.join(out, file);

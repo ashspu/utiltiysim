@@ -28,7 +28,7 @@ accountButton.addEventListener('keydown', event => {
     event.preventDefault();
     accountPanel.hidden = false;
     accountButton.setAttribute('aria-expanded', 'true');
-    accountPanel.querySelector('button').focus();
+    accountPanel.querySelector('button, a').focus();
   }
 });
 account.addEventListener('focusout', event => {
@@ -40,6 +40,9 @@ document.addEventListener('click', event => {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !accountPanel.hidden) closeAccount(true);
 });
+// The offline prototype explains its unconfigured account. Hosted entry replaces
+// that dialog with WorkOS links but shares this disclosure and scroll narrative.
+if (signInDialog) {
 document.querySelector('#welcome-sign-in').addEventListener('click', () => {
   closeAccount();
   signInDialog.showModal();
@@ -54,6 +57,7 @@ signInDialog.addEventListener('click', event => {
   const rect = signInDialog.getBoundingClientRect();
   if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) signInDialog.close();
 });
+}
 
 function selectChapter(index) {
   if (activeChapter === index) return;
@@ -99,7 +103,7 @@ compact.addEventListener('change', scheduleStory);
 new MutationObserver(() => {
   if (document.body.dataset.view !== 'welcome') {
     closeAccount();
-    if (signInDialog.open) signInDialog.close();
+    if (signInDialog?.open) signInDialog.close();
   }
   scheduleStory();
 }).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
