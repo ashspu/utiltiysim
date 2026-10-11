@@ -15,12 +15,16 @@ from utilsim.world import cruise, storms
 from utilsim.world.map_view import WorldMap
 from utilsim.world.store import MODEL_VERSION, World, canonical
 
+from . import setup
 from .templates import read_json, sha, verify
 
 
 def configuration(value):
-    if not isinstance(value, dict) or set(value) - {'world'}:
-        raise ValueError('Only world weather and meter settings are supported for an illustrated map; geography cannot change.')
+    if not isinstance(value, dict) or set(value) - {'world', 'physical', 'schemaVersion'}:
+        raise ValueError('Unsupported setup group. Use the advertised physical setup schema; geography cannot change.')
+    extended = 'physical' in value or 'schemaVersion' in value
+    if extended and value.get('schemaVersion') != setup.VERSION:
+        raise ValueError('Physical policies require schemaVersion ' + setup.VERSION)
     supplied = value.get('world', {})
     schema, defaults = world_configuration()
     if not isinstance(supplied, dict) or set(supplied) - set(defaults):
@@ -35,7 +39,7 @@ def configuration(value):
             if number < bounds.get('minimum', -math.inf) or number > bounds.get('maximum', math.inf):
                 raise ValueError('World setting outside supported bounds.')
         defaults[group].update(fields)
-    return {'world': defaults}
+    return {'world': defaults, **({'schemaVersion': setup.VERSION, 'physical': setup.normalize(value.get('physical', {}))} if extended else {})}
 
 
 class ManagedWorld(World):
@@ -59,6 +63,8 @@ class HostedLibrary:
                        'id TEXT PRIMARY KEY, principal TEXT NOT NULL, command TEXT NOT NULL,'
                        'request TEXT NOT NULL, manifest TEXT NOT NULL, bindings TEXT NOT NULL,'
                        'UNIQUE(principal,command))')
+            db.execute('CREATE TABLE IF NOT EXISTS hosted_initialization ('
+                       'id TEXT PRIMARY KEY,state TEXT NOT NULL,progress TEXT NOT NULL)')
 
     def templates(self):
         entries = []
@@ -116,6 +122,7 @@ class HostedLibrary:
             if existing['request'] != encoded:
                 raise ValueError('That creation command belongs to different inputs.')
             world_creation.retry(self.library, existing['id'])
+            self.apply_setup(existing)
             return self.describe(existing)
         directory, manifest = self.template(value['sourceId'], value['sourceRevision'])
         snapshot = read_json(directory / 'source-snapshot.json')
@@ -140,8 +147,34 @@ class HostedLibrary:
                            (identity, principal, command, encoded, canonical(manifest), canonical(bindings)))
                 db.execute('INSERT INTO world_creations VALUES(?,?,?,?,?,?)',
                            (identity, engine_request, pinned, sha(pinned.encode()), identity, 'pending'))
+                if 'physical' in request['configuration']:
+                    db.execute('INSERT INTO hosted_initialization VALUES(?,?,?)',
+                               (identity, 'pending', canonical({'appliedCommands': 0})))
         world_creation.retry(self.library, identity)
-        return self.describe(self.lookup(principal, identity))
+        row = self.lookup(principal, identity)
+        self.apply_setup(row)
+        return self.describe(row)
+
+    def initialization(self, identity):
+        with self.library.db() as db:
+            row = db.execute('SELECT * FROM hosted_initialization WHERE id=?', (identity,)).fetchone()
+        return {'state': row['state'], **json.loads(row['progress'])} if row else {'state': 'complete', 'appliedCommands': 0}
+
+    def apply_setup(self, row):
+        if self.initialization(row['id'])['state'] == 'complete':
+            return
+        request = json.loads(row['request'])
+        def progress(count):
+            with self.library.db() as db:
+                db.execute('UPDATE hosted_initialization SET progress=? WHERE id=?',
+                           (canonical({'appliedCommands': count}), row['id']))
+        with self.manual_world(row, initializing=True) as world:
+            result = setup.apply(world, row['id'], request['configuration'], json.loads(row['bindings']),
+                                 WorldMap(world).snapshot(), progress)
+            state = 'complete' if result.pop('complete') else 'pending'
+            with self.library.db() as db:
+                db.execute('UPDATE hosted_initialization SET state=?,progress=? WHERE id=?',
+                           (state, canonical(result), row['id']))
 
     def describe(self, row):
         request, manifest = json.loads(row['request']), json.loads(row['manifest'])
@@ -156,6 +189,7 @@ class HostedLibrary:
         with self.library.db() as db:
             state = db.execute('SELECT state FROM world_creations WHERE command=?', (row['id'],)).fetchone()[0]
         result['state'] = state
+        result['initialization'] = self.initialization(row['id'])
         try:
             world = self.library.world(row['id'])
             result.update(WorldMap(world).status(), available=True)
@@ -163,6 +197,9 @@ class HostedLibrary:
                 result['fingerprint'] = world.metadata(db)['fingerprint']
         except (OSError, sqlite3.Error, KeyError, ValueError):
             result.update(available=False, error='Saved world is pending or unavailable. Retry its original creation command or restore its volume.')
+        if result['initialization']['state'] != 'complete':
+            result.update(state='configuring', available=False,
+                          error='Initial physical policies are incomplete. Retry the original creation request before advancing.')
         return result
 
     def listing(self, principal):
@@ -181,7 +218,9 @@ class HostedLibrary:
         return self.describe(row)
 
     @contextmanager
-    def manual_world(self, row):
+    def manual_world(self, row, initializing=False):
+        if not initializing and self.initialization(row['id'])['state'] != 'complete':
+            raise ValueError('Initial physical setup is incomplete; retry its original creation request first.')
         readonly = self.library.world(row['id'])
         # Same lock order and clock ownership as the original local controls.
         with cruise.manual_control(readonly):

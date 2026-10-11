@@ -25,7 +25,7 @@ def setup(tmp_path):
     root = tmp_path / 'store'
     files = {'source-snapshot.json': canonical(snapshot),
              'bindings.json': canonical({'premises': [
-                 {'parcelId': 'parcel-' + p['id'], 'premiseId': p['id'],
+                 {'parcelId': 'parcel-' + p['id'], 'premiseId': p['id'], 'premiseType': 'residential',
                   'meterIds': [s['meterId'] for s in snapshot['servicePoints'] if s['premiseId'] == p['id']]}
                  for p in snapshot['premises']]})}
     manifest = {'sourceId': 'test-map', 'grantTownId': 'map-one', 'name': 'Test map', 'townId': snapshot['id'],

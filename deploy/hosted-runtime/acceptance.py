@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--package', required=True)
     parser.add_argument('--root', required=True)
     parser.add_argument('--report', required=True)
+    parser.add_argument('--customer-setup', action='store_true')
     args = parser.parse_args()
     package = Path(args.package)
     source_paths = [p for p in package.rglob('*') if p.is_file()]
@@ -61,13 +62,34 @@ def main():
         response.raise_for_status()
         return response.json()
 
+    setup_request_seconds = []
+    def create_world(value):
+        for attempt in range(100):
+            request_started = time.monotonic()
+            result = call('POST', '/hosted/worlds', json=value)
+            setup_request_seconds.append(round(time.monotonic() - request_started, 3))
+            if result['available']:
+                return result
+            if attempt % 4 == 0:
+                print(json.dumps({'setupProgress': result['initialization']}), flush=True)
+        raise RuntimeError('Setup did not finish within bounded acceptance retries.')
+
     process = launch()
     try:
         value = {'commandId': str(uuid.uuid4()), 'sourceId': 'lantern-harbour', 'sourceRevision': revision,
                  'name': 'Isolated accepted-map restart QA', 'start': '2026-07-15',
                  'configuration': {'world': {'weather': {'summer_mean_c': 29}, 'meters': {'annual_meter_failure': 0}}}}
-        first = call('POST', '/hosted/worlds', json=value)
-        second = call('POST', '/hosted/worlds', json={**value, 'commandId': str(uuid.uuid4())})
+        if args.customer_setup:
+            value['configuration'].update(schemaVersion='physical-setup/2', physical={
+                'customerContacts': {'active': True, 'noticeProbabilityPerDay': .8},
+                'householdFinance': {'enabled': True, 'cashCents': 10000, 'essentialReserveCents': 2000,
+                                     'maxPaymentCents': 3000, 'paymentProbability': .6},
+                'householdCashflow': {'enabled': True, 'incomeCents': 1000, 'incomeIntervalDays': 1,
+                                      'expenseCents': 400, 'expenseIntervalDays': 1}})
+        started = time.monotonic()
+        first = create_world(value)
+        creation_seconds = round(time.monotonic() - started, 2)
+        second = create_world({**value, 'commandId': str(uuid.uuid4()), 'configuration': {'world': value['configuration']['world']}})
         base = '/hosted/worlds/' + first['id']
         assert first['environmentId'] != second['environmentId']
         assert first['days'] == first['observations'] == 0
@@ -110,7 +132,10 @@ def main():
         assert next(e for e in storm_history['events'] if e['stormId'] == cancelled_receipt['stormId'])['cancelledEventId']
         assert client.post(storm_path, json={**cancellation, 'commandId': str(uuid.uuid4()), 'expectedRevision': 3,
                                            'effectiveDate': resumed['through'], 'stormId': storm_receipt['stormId']}).status_code == 422
-        assert 'StormWeatherApplied' in {e['type'] for e in call('GET', base + '/events')['events']}
+        journal = call('GET', base + '/events?limit=50')
+        while 'StormWeatherApplied' not in {e['type'] for e in journal['events']} and journal['nextBefore'] is not None:
+            journal = call('GET', base + '/events?limit=50&before=' + str(journal['nextBefore']))
+        assert 'StormWeatherApplied' in {e['type'] for e in journal['events']}
         assert call('GET', '/hosted/worlds/' + second['id'] + '/events/storms')['history'] == []
         picks = []
         for kind in sorted({p.get('premiseType', 'unknown') for p in original}):
@@ -123,11 +148,25 @@ def main():
             assert {r['assetId'] for r in history['readings']} <= set(binding['meterIds'])
             picks.append({'type': kind, 'premiseId': binding['premiseId'], 'readings': len(history['readings'])})
         assert client.get(base, headers={'X-UtilitySim-User-Id': 'other-principal'}).status_code == 404
+        customer_proof = None
+        if args.customer_setup:
+            residential = next(p for p in original if p['premiseType'] == 'residential')
+            customer_path = base + '/premises/' + residential['premiseId'] + '/customer'
+            customer = call('GET', customer_path)
+            assert customer['finance']['cashCents'] == 11200
+            assert len(customer['cashflow']['history']) == 2
+            assert first['initialization']['eligibleHouseholds'] == 300
+            assert first['initialization']['appliedCommands'] == 601
+            customer_proof = {'initialization': first['initialization'], 'creationSeconds': creation_seconds,
+                              'maxCreateRequestSeconds': max(setup_request_seconds), 'createRequestCount': len(setup_request_seconds),
+                              'samplePremiseId': residential['premiseId'], 'startingCashCents': 10000,
+                              'resumedCashCents': customer['finance']['cashCents'], 'cashflowDays': 2}
         assert all(p.exists() and sha(p.read_bytes()) == before[str(p)] for p in source_paths)
         report = {'status': 'passed-local-only', 'sourceRevision': revision, 'sourceFilesUnchanged': len(source_paths),
                   'sourceWorldChecked': source_world.exists(), 'counts': first['counts'], 'independentWorldIds': [first['id'], second['id']],
                   'restartResumedThrough': resumed['through'], 'observations': resumed['observations'], 'premiseChecks': picks,
                   'configurationRoundtrip': True, 'actualProcessRestart': True, 'idempotentCreate': True,
+                  'customerSetup': customer_proof,
                   'principalIsolation': True, 'mapAndMeterBindingsExact': True, 'hostedDeployed': False,
                   'stormLoop': {'scheduled': True, 'cancelledBeforeStart': True, 'startedCancellationRejected': True,
                                 'exactRetryAfterRestart': True, 'appliedDays': len(storm_history['history']),

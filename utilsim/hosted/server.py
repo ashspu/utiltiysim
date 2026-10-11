@@ -9,11 +9,11 @@ from datetime import UTC, datetime
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from utilsim.config.wizard import world_configuration
-from utilsim.world import storms
+from utilsim.world import customer_cashflow, customer_finance, storms
 from utilsim.world.map_view import WorldMap
 
 from .library import HostedLibrary
+from .setup import presentation
 
 ROLES = {'view': {'owner', 'operator', 'billing', 'support', 'analyst'},
          'create': {'owner'}, 'advance': {'owner', 'operator'}}
@@ -102,11 +102,11 @@ def create_app(root, token):
         _, manifest = library.template(source, sourceRevision)
         if not permits(request.state.grants, 'view', manifest['grantTownId']):
             raise HTTPException(403, 'Source access refused.')
-        schema, defaults = world_configuration()
         return {'sourceId': source, 'sourceRevision': sourceRevision, 'townId': manifest['townId'],
                 'grantTownId': manifest['grantTownId'], 'counts': manifest['counts'],
-                'schemas': {'world': schema}, 'defaults': {'world': defaults},
-                'immutable': ['population', 'premises', 'demandProfiles', 'networks', 'meters', 'geometry', 'timezone'],
+                **presentation(),
+                'immutable': ['streets', 'parcels', 'premiseIds', 'serviceIds', 'meterIds'],
+                'currentAdapterFixed': ['startingPopulation', 'demandProfiles', 'networkTopology', 'housingAge', 'meterChannels', 'timezone'],
                 'excluded': ['billing', 'collections', 'VEE', 'staffing', 'enterpriseWorkQueues', 'studioRun']}
 
     @app.get('/hosted/worlds')
@@ -171,6 +171,15 @@ def create_app(root, token):
         return {'worldInstanceId': identity, 'environmentId': record['environmentId'], 'townId': record['townId'],
                 'premise': record['premise'], 'through': record['through'], 'totalDays': total,
                 'offset': offset, 'limit': limit, 'readings': rows}
+
+    @app.get('/hosted/worlds/{identity}/premises/{premise}/customer')
+    def customer_state(identity: str, premise: str, request: Request, before: str | None = None,
+                       limit: int = Query(25, ge=1, le=50)):
+        owned(identity, request)
+        world = library.library.world(identity)
+        return {'worldInstanceId': identity, 'view': 'administrator-truth',
+                'finance': customer_finance.inspect(world, premise),
+                'cashflow': customer_cashflow.inspect(world, premise, before=before, limit=limit)}
 
     @app.get('/hosted/worlds/{identity}/observations')
     def observations(identity: str, request: Request, start: str, end: str):

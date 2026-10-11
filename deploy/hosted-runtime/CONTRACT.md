@@ -73,6 +73,28 @@ End dates are exclusive UTC days. Duration 1–90 days, temperature offset −40
 
 Manual advancement and storm mutation use the existing cruise lock and reject worlds owned by cruise or managed delivery. Invalid commands do not invoke constructor migrations. World inspection remains read-only. The accepted-map source stays unchanged.
 
-## Ownership and source scope
+## Physical setup v2: supported customer policies
+
+GET source configuration now advertises `configurationVersion:'physical-setup/2'`, `schemas.world`, `schemas.physical`, and complete `defaults` including schemaVersion. Old `{world:...}` creation payloads remain valid and preserve their behavior. Extended configurations require `{schemaVersion:'physical-setup/2',world:{...},physical:{...}}`; missing fields normalize to defaults. Unknown groups, unsupported versions, wrong types/ranges and cashflow without finance are rejected before reserving a world. The new source artifact is `P:/UtilitySim/outputs/shell-workos/hosted-physical-setup-v2.json`.
+
+Supported physical groups:
+
+| Group | Fields | Actual engine application |
+| --- | --- | --- |
+| `customerContacts` | active, noticeProbabilityPerDay, deliveryDelaySeconds, repeatAfterDays, maxContacts | Existing experienced-symptom contact policy, not call-centre staffing/queues. |
+| `householdFinance` | enabled, cashCents, essentialReserveCents, maxPaymentCents, paymentProbability | Initial cash/reserve/payment policy for each occupied residential premise, with a distinct instance/premise recipient reference. No enterprise bill is generated. |
+| `householdCashflow` | enabled, incomeCents, incomeIntervalDays, expenseCents, expenseIntervalDays, insufficientCashPolicy | Existing recurring income/essential-expense engine, starting on the world start date. Fixed UTC-day intervals, not calendar months. Requires household finance. |
+
+All three groups are opt-in by default. Initial assumptions are uniform across occupied residential households; distribution controls are not yet implemented. Financial values are minor currency units with no currency conversion. Existing physical modules own validation, state, cashflow events and observations. Payment intentions still require actual trusted received obligations; configuring finances does not fabricate bills or settle VS balances.
+
+Numeric field schemas include `x-control:{kind:'slider',step,unit,allowExactInput,referenceValue,referenceLabel,labels,effect,severityBasis}`. World-weather/meter controls add `displayMinimum`/`displayMaximum` for the suggested slider track while original validation bounds remain authoritative. Reference values are illustrative defaults, not calibrated normality or judgments about customers. Browser controls must not discard exact values outside a suggested display range but inside engine validation.
+
+The setup journal atomically reserves initial configuration with world creation. Per-domain/per-premise command IDs are deterministic; interrupted setup can replay committed commands without duplication or resetting cash. Each POST commits at most 10 new domain commands and stops between commands after an 8-second soft budget. A single command is atomic and cannot be interrupted by this budget. Until all requested initial commands finish, status is `state:'configuring',available:false,initialization:{state:'pending',eligibleHouseholds,appliedCommands,totalCommands}` and advance/event mutations are refused. Retain and retry the entire original create payload, including commandId, to continue; GET status/list do not perform setup. Completion reports `state:'complete',available:true,initialization:{state:'complete',eligibleHouseholds,appliedCommands,totalCommands}`. During crash recovery the progress object may contain only state/appliedCommands until the next successful batch. A gateway timeout is not proof of failure or success; exact POST retry resolves unfinished setup. There is no background setup worker in this slice.
+
+GET `/hosted/worlds/{id}/premises/{premise}/customer?before=YYYY-MM-DD&limit=25` returns `{worldInstanceId,view:'administrator-truth',finance,cashflow}` using existing physical inspection. Cashflow supplies bounded dated history/nextBefore. Principal ownership and current view grant apply. This route is private administrator truth, not a VS observation feed.
+
+**Desired scope versus present implementation:** Greg explicitly includes AMI/AMR/manual mix, housing-age distribution, customer behavior/finances and physical utility-operation assumptions in world setup. Only staffing, enterprise throughput/queues and enterprise business decisions belong elsewhere. Geography/stable IDs are pinned; other attributes are not categorically forbidden. AMI/age effects and customer sentiment remain advertised required gaps until their model/adapter tests pass. Sentiment should combine town confidence/news influence and personal received/experienced service history, with bounded contact/repeat/escalation feedback and recovery; it is not implemented by these contact-probability controls.
+
+## Ownership
 
 Backend chat `01a12bf4-9f78-7411-ac48-15750ae1d151` owns `utilsim/hosted/`, its tests and `deploy/hosted-runtime/`. Shell chat `01a12acd-01bf-7801-b837-d651ab299083` owns UI, WorkOS gateway and canonical Vercel release. Coordinator `01a12759-bb9e-79b1-b1b9-32f0a5864e10` coordinates online draft storage. Standing coordination authorization: Greg, 2026-10-11, chat `01a12aa3-5c1e-7142-aad0-dd177c7c9f09`.
