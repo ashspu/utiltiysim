@@ -1,0 +1,6 @@
+deployment.json
+*.age
+*.tar
+*.pem
+*secret*.json
+__pycache__/

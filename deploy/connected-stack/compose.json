@@ -1,0 +1,78 @@
+{
+  "name": "utilitysim-b",
+  "services": {
+    "producer": {
+      "image": "${PRODUCER_IMAGE:?Supply a verified digest-pinned producer image}",
+      "pull_policy": "never",
+      "user": "10001:10001",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "init": true,
+      "restart": "unless-stopped",
+      "stop_grace_period": "2m",
+      "entrypoint": ["python", "/ops/stack.py", "launch", "producer"],
+      "command": [],
+      "environment": {"UTILITYSIM_DATA_ROOT": "/data", "PYTHONDONTWRITEBYTECODE": "1"},
+      "volumes": [
+        {"type": "bind", "source": "${STACK_DATA_ROOT:?}/producer", "target": "/data", "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${STACK_CONFIG:?}", "target": "/config/deployment.json", "read_only": true, "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${PRODUCER_SECRETS:?}", "target": "/secrets/service.json", "read_only": true, "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${STACK_OPS:?}", "target": "/ops", "read_only": true, "bind": {"create_host_path": false}}
+      ],
+      "tmpfs": ["/tmp:rw,nosuid,nodev,size=128m,uid=10001,gid=10001"],
+      "networks": ["owners"],
+      "healthcheck": {"test": ["CMD", "python", "/ops/stack.py", "health", "producer"], "interval": "30s", "timeout": "15s", "retries": 3, "start_period": "30s"},
+      "logging": {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}}
+    },
+    "controller": {
+      "image": "${CONTROLLER_IMAGE:?Supply a verified digest-pinned private VS image}",
+      "pull_policy": "never",
+      "user": "10001:10001",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "init": true,
+      "restart": "unless-stopped",
+      "stop_grace_period": "2m",
+      "entrypoint": ["python", "/ops/stack.py", "launch", "controller"],
+      "command": [],
+      "environment": {"PYTHONDONTWRITEBYTECODE": "1"},
+      "volumes": [
+        {"type": "bind", "source": "${STACK_DATA_ROOT:?}/controller", "target": "/data", "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${STACK_CONFIG:?}", "target": "/config/deployment.json", "read_only": true, "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${CONTROLLER_SECRETS:?}", "target": "/secrets/service.json", "read_only": true, "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${STACK_OPS:?}", "target": "/ops", "read_only": true, "bind": {"create_host_path": false}}
+      ],
+      "tmpfs": ["/tmp:rw,nosuid,nodev,size=128m,uid=10001,gid=10001"],
+      "network_mode": "service:producer",
+      "depends_on": {"producer": {"condition": "service_healthy"}},
+      "healthcheck": {"test": ["CMD", "python", "/ops/stack.py", "health", "controller"], "interval": "30s", "timeout": "15s", "retries": 3, "start_period": "30s"},
+      "logging": {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}}
+    },
+    "edge": {
+      "image": "${EDGE_IMAGE:?Supply a verified digest-pinned Caddy image}",
+      "pull_policy": "never",
+      "user": "10001:10001",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "init": true,
+      "restart": "unless-stopped",
+      "entrypoint": ["caddy"],
+      "command": ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+      "environment": {"PRODUCER_HOST": "${PRODUCER_HOST:?Supply the actual TLS hostname}"},
+      "ports": ["443:8443"],
+      "volumes": [
+        {"type": "bind", "source": "${STACK_OPS:?}/Caddyfile", "target": "/etc/caddy/Caddyfile", "read_only": true, "bind": {"create_host_path": false}},
+        {"type": "bind", "source": "${TLS_DIRECTORY:?}", "target": "/tls", "read_only": true, "bind": {"create_host_path": false}}
+      ],
+      "tmpfs": ["/tmp:rw,nosuid,nodev,size=32m,uid=10001,gid=10001", "/config:rw,nosuid,nodev,size=32m,uid=10001,gid=10001", "/data:rw,nosuid,nodev,size=32m,uid=10001,gid=10001"],
+      "networks": ["ingress", "owners"],
+      "depends_on": {"producer": {"condition": "service_healthy"}, "controller": {"condition": "service_healthy"}},
+      "healthcheck": {"test": ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"], "interval": "30s", "timeout": "15s", "retries": 3},
+      "logging": {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}}
+    }
+  },
+  "networks": {"owners": {"internal": true}, "ingress": {}}
+}

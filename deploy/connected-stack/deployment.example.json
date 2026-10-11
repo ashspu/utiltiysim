@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "utilitysim-connected-stack/1",
+  "readiness": "candidate",
+  "runId": null,
+  "fieldEnabled": false,
+  "volumeId": null,
+  "producerHost": null,
+  "dataRoot": "/srv/utilitysim-b/data",
+  "tlsDirectory": "/etc/utilitysim-b/tls",
+  "backupDirectory": "/srv/utilitysim-b-backups",
+  "ageRecipient": null,
+  "ownerFiles": {
+    "world": {"service": "producer", "path": null},
+    "catalog": {"service": "producer", "path": "world-library.sqlite"},
+    "runtime": {"service": "controller", "path": null},
+    "billing": {"service": "controller", "path": null},
+    "ledger": {"service": "controller", "path": null},
+    "evidence": {"service": "controller", "path": null},
+    "controller": {"service": "controller", "path": "control.sqlite"}
+  },
+  "services": {
+    "producer": {
+      "image": null,
+      "sourceCommit": "44e5af22df6e552773a4554c912bd05e0b764c9b",
+      "secretsFile": "/etc/utilitysim-b/producer.json",
+      "requiredSecrets": ["UTILITYSIM_RUNTIME_TOKEN"],
+      "command": ["uvicorn", "utilsim.hosted.server:from_environment", "--factory", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"],
+      "healthCommand": []
+    },
+    "controller": {
+      "image": null,
+      "sourceCommit": "32c91ff2e8b926e4be47a7800df5935f9cf724ec",
+      "secretsFile": "/etc/utilitysim-b/controller.json",
+      "requiredSecrets": [],
+      "command": [],
+      "healthCommand": [],
+      "pauseCommand": [],
+      "checkpointCommand": []
+    },
+    "edge": {"image": null}
+  },
+  "evidence": {
+    "producerContainerAcceptance": null,
+    "controllerConnectedAcceptance": null,
+    "intervalCompatibilityCommit": "17c9e4ffd685fa0d8fc7d8a0593f5fbf55863eff",
+    "linuxRestoreAcceptance": null
+  }
+}
