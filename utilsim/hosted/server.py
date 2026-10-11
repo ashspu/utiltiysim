@@ -2,6 +2,7 @@
 import hmac
 import json
 import os
+import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime
@@ -35,18 +36,43 @@ def permits(grants, action, town):
     return False
 
 
-def create_app(root, token):
+def create_app(root, token, machine_key=None, controller_id='utilitysim-controller', controller_url=None,
+               controller_token=None, controller_allow_http=False):
     if not isinstance(token, str) or len(token) < 32:
         raise ValueError('Configure an internal bearer token of at least 32 characters.')
+    if machine_key is not None and machine_key == token:
+        raise ValueError('Machine key must be distinct from the browser gateway credential.')
+    if controller_token is not None and controller_token in (token, machine_key):
+        raise ValueError('Controller service token must be distinct from gateway and machine credentials.')
     library = HostedLibrary(root)
+    from .machine import MachinePort
+    from .machine_routes import install
+
+    machine = MachinePort(library, machine_key, controller_id)
+    library.machine = machine
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.library = library
 
     @app.middleware('http')
     async def authenticate(request, call_next):
         supplied = request.headers.get('authorization', '')
+        if request.url.path.startswith('/machine/'):
+            parts = request.url.path.split('/')
+            try:
+                if len(parts) < 5 or parts[2] != 'worlds' or not re.fullmatch(r'[a-f0-9]{32}', parts[3]):
+                    raise PermissionError()
+                request.state.connection = machine.authenticate(parts[3], supplied)
+            except (PermissionError, KeyError, ValueError):
+                return JSONResponse({'detail': 'Fixed-world machine capability required.'}, status_code=401)
+            response = await call_next(request)
+            response.headers['Cache-Control'] = 'no-store'
+            return response
         if not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
             return JSONResponse({'detail': 'Internal gateway authentication required.'}, status_code=401)
+        if request.url.path == '/hosted/health':
+            response = await call_next(request)
+            response.headers['Cache-Control'] = 'no-store'
+            return response
         principal = request.headers.get('x-utilitysim-user-id', '')
         try:
             grants = json.loads(request.headers.get('x-utilitysim-grants', '[]'))
@@ -252,6 +278,7 @@ def create_app(root, token):
     def sentiment_action(identity: str, request: Request, value: dict = Depends(body)):
         return library.sentiment_command(owned(identity, request, 'advance'), value)
 
+    install(app, machine, owned, body, controller_url, controller_token, controller_allow_http)
     return app
 
 
@@ -259,4 +286,16 @@ def from_environment():
     root = os.environ.get('UTILITYSIM_DATA_ROOT')
     if not root:
         raise ValueError('Mount a durable volume and set UTILITYSIM_DATA_ROOT; ephemeral disk is unsupported.')
-    return create_app(root, os.environ.get('UTILITYSIM_RUNTIME_TOKEN'))
+    def secret(name):
+        value, path = os.environ.get(name), os.environ.get(name + '_FILE')
+        if value and path:
+            raise ValueError('Configure a secret value or a secret file, not both.')
+        if path:
+            from pathlib import Path
+            return Path(path).read_text(encoding='utf-8').strip()
+        return value
+
+    return create_app(root, secret('UTILITYSIM_RUNTIME_TOKEN'), secret('UTILITYSIM_MACHINE_KEY'),
+                      os.environ.get('UTILITYSIM_CONTROLLER_ID', 'utilitysim-controller'),
+                      os.environ.get('UTILITYSIM_CONTROLLER_URL'), secret('UTILITYSIM_CONTROLLER_TOKEN'),
+                      os.environ.get('UTILITYSIM_CONTROLLER_ALLOW_HTTP') == '1')

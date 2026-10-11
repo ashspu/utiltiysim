@@ -1,10 +1,18 @@
-# Future compute deployment
+# Persistent producer hosting
 
-No resources, costs or runtime deployment were provisioned in this work. Greg separated online initial setup (shell-owned durable setup drafts) from future online compute on 2026-10-11. Vercel remains the public UI/WorkOS gateway.
+The packaged readiness command is `python -m utilsim.hosted.health`. It probes
+`http://127.0.0.1:8080/hosted/health` using the protected gateway credential from
+`UTILITYSIM_RUNTIME_TOKEN_FILE` (or the existing environment variable). The route
+checks the producer catalog under gateway authentication without granting a user
+world access. `--origin` and `--token-file` support isolated owner acceptance;
+the probe forbids redirects and proxies and prints no credential or private state.
+The Docker image runs the same command as its health check. Readiness means this
+producer is reachable and its catalog opens; it does not assert VS, billing or
+whole-stack readiness.
 
-Recommended first compute deployment: one Linux Azure VM with one attached managed **data** disk, running this service as a single container or systemd process. Mount the durable ext4 volume at `/data`, owned by the service user (container UID 10001). Keep journal, immutable templates and world SQLite files together. This recommendation preserves the existing SQLite transactional engine with no storage rewrite. Azure managed disks are block volumes attached to VMs; Azure temporary disks can lose data during maintenance/redeployment/stop. [Microsoft disk documentation](https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview).
+Greg selected Ash's existing persistent host for the coordinated B system on2026-10-11. Root coordinates actual host access and resource/cost inspection; no new paid host is implied. Vercel remains the public UI/WorkOS gateway. Local implementation and container checks do not establish a production connection.
 
-Azure Container Apps supports ephemeral container/replica storage and Azure Files mounts. Choosing it would require separately proving SQLite locking, fsync and crash behavior on the selected network filesystem. It is not the default for this unchanged engine. [Microsoft Container Apps storage documentation](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts).
+Run one producer process/container with persistent block-backed data owned by the service user (UID10001). Keep journal, immutable templates and world SQLite files together at stable paths. The earlier Azure VM candidate is superseded by Greg's existing-host decision; its storage requirement remains the same: preserve SQLite locking, fsync and recovery on the selected host's durable volume.
 
 Required before deployment: subscription/project/region and budget decision; authorized compute resource; mounted durable data disk; secret distribution; restricted TLS ingress accessible only to the Vercel gateway; monitoring and bounded request concurrency; consistent backup/restore and volume replacement drill. No autoscaling or multi-host shared SQLite writers. A single worker may accept multiple requests, but SQLite serializes writes; distinct world files isolate daily histories. Longer jobs need a persisted command queue with polling before larger presets are enabled. A 31-day per-request bound is not a performance SLA.
 
@@ -21,4 +29,8 @@ export UTILITYSIM_DATA_ROOT=/data
 uvicorn utilsim.hosted.server:from_environment --factory --host 127.0.0.1 --port 8080 --workers 1
 ```
 
-The included Dockerfile is a packaging candidate, not a verified build. Build context is repository root. It includes the existing Python engine dependencies. Do not ship local secrets or world data in the image.
+The Dockerfile now pins the Python3.12-slim manifest digest, uses uv0.13.0 and `uv sync --frozen --no-dev --no-editable` with the repository lockfile, labels the source revision, creates a writable data mount point and runs as UID10001. uv's documented Docker workflow supports frozen/noneditable installs ([official uv Docker guide](https://docs.astral.sh/uv/guides/integration/docker/)). Build context is repository root; `.dockerignore` excludes private token/database/runtime artifacts. Do not ship local secrets or world data in the image.
+
+Actual Linux image build/boot evidence is collected by the narrow `hosted-runtime-container` PR-ready/manual workflow and `scripts/check_hosted_container.py`: non-root persistent volume, authenticated health, distinct gateway/machine credentials, actual four-service observations with availability, exact retry after process restart, and checked stopped-volume restore. The workflow performs no registry push or deployment and uses only ephemeral test secrets. Until that run succeeds the Dockerfile remains a build candidate, not verified Linux or hosting evidence. Estimated incremental8–10 runner minutes/run (32–40/month at4 runs),15-minute timeout; drafts run nothing and obsolete runs cancel.
+
+Greg selected Ash's existing persistent host for B on2026-10-11; root coordinates provider/access/budget discovery, with no new paid host implied. The shell remains on Vercel. The agreed deployment composition is owned separately in `deploy/connected-stack/`: private producer8080 and controller8027 share an inspected private/loopback network; only TLS edge443 is public. Bind the producer volume and every VS owner to stable original paths. Use secret files for gateway token, machine key and controller service token, never browser bootstrap or general gateway credentials in the worker. The connection capability goes into the fixed private controller's token file. Authenticated readiness and coordinated paused/stopped backup are deployment gates. Do not mark a static shell release, local HTTP fixture or producer-only restore as connected production acceptance.

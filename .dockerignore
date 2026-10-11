@@ -3,6 +3,13 @@
 .vercel
 .env
 .env.*
+**/.env
+**/.env.*
+**/*.token
+**/*.sqlite
+**/*.sqlite-*
+runtime
+outputs
 **/node_modules
 **/__pycache__
 **/.pytest_cache

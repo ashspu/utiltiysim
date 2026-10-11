@@ -202,6 +202,8 @@ class HostedLibrary:
         if result['initialization']['state'] != 'complete':
             result.update(state='configuring', available=False,
                           error='Initial physical policies are incomplete. Retry the original creation request before advancing.')
+        if hasattr(self, 'machine'):
+            result['connectedClock'] = self.machine.marker(row['id'])
         return result
 
     def listing(self, principal):
@@ -226,6 +228,8 @@ class HostedLibrary:
         readonly = self.library.world(row['id'])
         # Same lock order and clock ownership as the original local controls.
         with cruise.manual_control(readonly):
+            if hasattr(self, 'machine') and self.machine.marker(row['id'])['configured']:
+                raise ValueError('The connected controller owns this clock; use its coordinated controls.')
             with readonly.read_db() as db:
                 if db.execute('SELECT 1 FROM observation_delivery_configuration LIMIT 1').fetchone():
                     raise ValueError('Shared delivery owns this clock; use its configured runtime controls.')
