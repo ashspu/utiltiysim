@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "utilitysim-preset-release/1",
+  "title": "Proposed UtilitySim preset release evidence",
+  "type": "object",
+  "required": ["schema", "townId", "revision", "owner", "previewLabel", "releaseClass", "target", "counts", "assets", "stages", "reviewRecord", "unresolvedAreas"],
+  "properties": {
+    "schema": {"const": "utilitysim-preset-release/1"},
+    "townId": {"type": "string", "minLength": 1},
+    "revision": {"type": "string", "minLength": 1},
+    "owner": {"type": "string", "minLength": 1},
+    "previewLabel": {"type": "string", "minLength": 1},
+    "releaseClass": {"enum": ["development-preview", "playable-template"]},
+    "target": {
+      "type": "object", "required": ["metric", "value", "tolerance"],
+      "properties": {
+        "metric": {"enum": ["population", "homes"]},
+        "value": {"type": "integer", "minimum": 1},
+        "tolerance": {"type": "number", "minimum": 0, "maximum": 0.1}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["population", "homes", "residentialPremises", "otherPremises", "meters"],
+      "additionalProperties": {"type": ["integer", "null"], "minimum": 0}
+    },
+    "assets": {
+      "type": "object", "minProperties": 1,
+      "additionalProperties": {
+        "type": "object", "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "stages": {
+      "type": "object",
+      "required": ["zoning", "regional_art_seams", "roads_access", "visible_lot_parcels", "premise_service_ids", "block_illustration", "zoom_click_snapshot_qa"],
+      "additionalProperties": {
+        "type": "object", "required": ["status", "evidenceAssets"],
+        "properties": {
+          "status": {"enum": ["pending", "in-progress", "complete", "rejected"]},
+          "evidenceAssets": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+        }
+      }
+    },
+    "reviewRecord": {"type": ["string", "null"]},
+    "unresolvedAreas": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["areaId", "severity", "reason", "owner"],
+        "properties": {
+          "areaId": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["cosmetic", "blocking"]},
+          "reason": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
