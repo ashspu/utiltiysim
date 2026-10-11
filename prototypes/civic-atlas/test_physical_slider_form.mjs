@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { physicalFields, physicalDefaults, validatePhysicalValues, restorePhysicalPreset, sliderExtent } from './web/physical-slider-form.mjs';
+import { physicalFields, physicalDefaults, validatePhysicalValues, restorePhysicalPreset, sliderExtent, configurationFormSchema, upgradePhysicalConfiguration } from './web/physical-slider-form.mjs';
 const share = { type: 'number', minimum: 0, maximum: 100, multipleOf: .1 };
 const schema = { type: 'object', properties: {
   meters: { type: 'object', properties: { ami: { ...share, default: 60 }, amr: { ...share, default: 30 }, manual: { ...share, default: 10 }, invented: { type: 'number', default: 7, 'x-supported': false } } },
@@ -46,4 +46,36 @@ test('exclusive JSON-schema bounds are authoritative', () => {
   const bounded = { properties: { rate: { type: 'number', exclusiveMinimum: 0, exclusiveMaximum: 1 } } };
   assert.match(validatePhysicalValues(bounded, { rate: 0 })[0].message, /exceed/);
   assert.match(validatePhysicalValues(bounded, { rate: 1 })[0].message, /below/);
+});
+const configuration={schemas:{world:{type:'object',properties:{weather:{type:'object',properties:{winter:{type:'number',default:2}}}}},physical:{type:'object',properties:{
+  householdFinance:{type:'object',properties:{enabled:{type:'boolean',default:false},cash:{type:'integer',minimum:0,default:200000}}},
+  householdCashflow:{type:'object',properties:{enabled:{type:'boolean',default:false},policy:{type:'string',enum:['available-cash','all-or-nothing'],default:'available-cash'}}},
+}}},defaults:{schemaVersion:'physical-setup/2',world:{weather:{winter:2}},physical:{householdFinance:{enabled:false,cash:200000},householdCashflow:{enabled:false,policy:'available-cash'}}}};
+test('v1 draft stays legacy until explicit upgrade, preserving exact weather',()=>{
+  const legacy={world:{weather:{winter:-37.123}}},original=structuredClone(legacy);
+  const schema=configurationFormSchema(configuration,legacy);
+  assert.deepEqual(physicalFields(schema).map(field=>field.path),['world.weather.winter']);
+  assert.deepEqual(restorePhysicalPreset(schema,configuration.defaults,legacy),legacy);
+  const upgraded=upgradePhysicalConfiguration(legacy,configuration.defaults);
+  assert.equal(upgraded.world.weather.winter,-37.123);assert.equal(upgraded.schemaVersion,'physical-setup/2');
+  assert.equal(upgraded.physical.householdFinance.enabled,false);assert.equal(upgraded.physical.householdCashflow.enabled,false);
+  assert.deepEqual(legacy,original);
+});
+test('booleans and enums survive edit/preset/default round trips and validate dependencies',()=>{
+  const schema=configurationFormSchema(configuration,configuration.defaults);
+  const values=restorePhysicalPreset(schema,configuration.defaults,{physical:{householdFinance:{enabled:true},householdCashflow:{enabled:true,policy:'all-or-nothing'}}});
+  assert.equal(values.physical.householdFinance.enabled,true);assert.equal(values.physical.householdCashflow.policy,'all-or-nothing');
+  assert.deepEqual(validatePhysicalValues(schema,values),[]);
+  values.physical.householdFinance.enabled=false;
+  assert.match(validatePhysicalValues(schema,values)[0].message,/requires household finances/);
+  values.physical.householdCashflow.policy='invented';
+  assert.ok(validatePhysicalValues(schema,values).some(error=>/supported option/.test(error.message)));
+  const restored=restorePhysicalPreset(schema,configuration.defaults);
+  assert.equal(restored.physical.householdCashflow.enabled,false);assert.equal(restored.physical.householdCashflow.policy,'available-cash');
+});
+test('x-control display limits never constrain exact engine-valid input',()=>{
+  const field={type:'number',minimum:0,maximum:1,default:.01,'x-control':{displayMinimum:0,displayMaximum:.2,step:.001}};
+  assert.equal(sliderExtent(field,.03).max,.2);assert.equal(sliderExtent(field,.72).max,.72);
+  assert.equal(sliderExtent(field,.03).step,.001);
+  assert.deepEqual(validatePhysicalValues({properties:{rate:field}},{rate:.1234567}),[]);
 });

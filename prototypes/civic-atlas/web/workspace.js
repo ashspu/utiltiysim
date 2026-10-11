@@ -1,5 +1,5 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
-import { renderPhysicalSliderForm } from './physical-slider-form.mjs';
+import { renderPhysicalSliderForm, configurationFormSchema, upgradePhysicalConfiguration, physicalFields, getPath } from './physical-slider-form.mjs';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
 const isOwner = () => session.grants.some(g => g.role === 'owner');
@@ -52,12 +52,25 @@ function configure() {
   root.querySelector('#workspace-back').onclick=home;
   root.querySelector('#change-town').onclick=()=>{if(mayLeave()){dirty=false;draft=null;chooseTown();}};
   for(const [id,key] of [['world-name','name'],['world-start','start']])root.querySelector('#'+id).oninput=e=>{draft[key]=e.target.value;markDirty();};
-  form=renderPhysicalSliderForm(root.querySelector('#physical-settings'),catalog.configuration.schemas.world,{values:draft.configuration.world,defaults:catalog.configuration.defaults.world,onChange:values=>{draft.configuration.world=values;markDirty();}});
-  root.querySelector('#setup-form').onsubmit=e=>{e.preventDefault();if(form.validate().length||!e.target.reportValidity())return;draft.configuration.world=form.values;review();};
+  const note=root.querySelector('#setup-form .workspace-note');
+  const v2=draft.configuration.schemaVersion==='physical-setup/2';
+  note.textContent=v2?'Weather, meter condition and supported customer assumptions use the daily UTC clock. Enabled household settings apply uniformly to occupied residential households. Currency amounts use minor units: 100 units = 1 main currency unit.':'This saved setup uses the original weather and meter settings. It stays in its original format until you explicitly add customer settings.';
+  if(!v2&&catalog.configuration.defaults.schemaVersion==='physical-setup/2'&&catalog.configuration.schemas.physical){
+    const upgrade=document.createElement('button');upgrade.type='button';upgrade.textContent='Add customer settings';upgrade.onclick=()=>{draft.configuration=upgradePhysicalConfiguration(draft.configuration,catalog.configuration.defaults);markDirty();configure();};note.after(upgrade);
+  }
+  const schema=configurationFormSchema(catalog.configuration,draft.configuration);
+  const preserveVersion=values=>({...values,...(v2?{schemaVersion:'physical-setup/2'}:{})});
+  form=renderPhysicalSliderForm(root.querySelector('#physical-settings'),schema,{values:draft.configuration,defaults:v2?catalog.configuration.defaults:{world:catalog.configuration.defaults.world},onChange:values=>{draft.configuration=preserveVersion(values);markDirty();}});
+  root.querySelector('#setup-form').onsubmit=e=>{e.preventDefault();if(form.validate().length||!e.target.reportValidity())return;draft.configuration=preserveVersion(form.values);review();};
 }
 function review() {
-  const source=sourceFor(draft.sourceId),schema=catalog.configuration.schemas.world;
-  root.innerHTML=`${backButton()}<p class="eyebrow">CREATE A WORLD · 3 / 3</p><h1>Ready to save your setup.</h1><p class="intro">Save these starting conditions to your account. Running the simulation will become available when online compute is connected.</p><section class="setup-review"><h2>${esc(draft.name)}</h2><dl><div><dt>Town</dt><dd>${esc(source.name)} · fixed population and geography</dd></div><div><dt>Start date</dt><dd>${esc(draft.start)}</dd></div>${Object.entries(schema.properties).flatMap(([group,s])=>Object.entries(s.properties).map(([key,f])=>`<div><dt>${esc(f.title)}</dt><dd>${esc(draft.configuration.world[group][key])}${f['x-unit']?' '+esc(f['x-unit']):''}</dd></div>`)).join('')}</dl><p class="workspace-note">This creates a saved setup, with no simulated days or bill processing.</p><div class="setup-actions"><button id="edit-setup">← Edit settings</button><button class="primary" id="save-setup">Save setup online</button></div><p id="save-status" role="status"></p></section>`;
+  const source=sourceFor(draft.sourceId),schema=configurationFormSchema(catalog.configuration,draft.configuration);
+  const settings=physicalFields(schema).map(({path,schema:field})=>{
+    const value=getPath(draft.configuration,path),unit=field['x-control']?.unit??field['x-unit'];
+    const state=field.type==='boolean'?(value?'Enabled':'Disabled'):value;
+    return `<div><dt>${esc(field.title||path)}<small>${esc(path)}</small></dt><dd>${esc(state)}${unit?' '+esc(unit):''}</dd></div>`;
+  }).join('');
+  root.innerHTML=`${backButton()}<p class="eyebrow">CREATE A WORLD · 3 / 3</p><h1>Ready to save your setup.</h1><p class="intro">Save these starting conditions to your account. A connected physical runtime is required to start a simulation.</p><section class="setup-review"><h2>${esc(draft.name)}</h2><dl><div><dt>Town</dt><dd>${esc(source.name)} · fixed population and geography</dd></div><div><dt>Start date</dt><dd>${esc(draft.start)}</dd></div><div><dt>Setup format</dt><dd>${esc(draft.configuration.schemaVersion||'Original weather and meter settings')}</dd></div>${settings}</dl>${schema.properties.physical?'<p class="workspace-note">Enabled household settings apply uniformly to occupied residential households. Disabled groups retain their displayed assumptions without activating that behavior. Currency amounts use minor units: 100 units = 1 main currency unit. Household cash and payment intentions do not create bills or post enterprise payments.</p>':''}<p class="workspace-note">This creates a saved setup, with no simulated days or bill processing.</p><div class="setup-actions"><button id="edit-setup">← Edit settings</button><button class="primary" id="save-setup">Save setup online</button></div><p id="save-status" role="status"></p></section>`;
   root.querySelector('#workspace-back').onclick=home;root.querySelector('#edit-setup').onclick=configure;
   root.querySelector('#save-setup').onclick=async()=>{
     const button=root.querySelector('#save-setup'), feedback=root.querySelector('#save-status');button.disabled=true;feedback.textContent='Saving to your account…';
@@ -78,7 +91,7 @@ async function openLibrary() {
   try{const {setups}=await api('/api/setups');if(!list.isConnected)return;list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><span class="eyebrow">SAVED STARTING CONDITIONS</span><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>Saved ${esc(new Date(s.updatedAt).toLocaleString())}</small><div class="saved-setup-actions"><button data-open-setup="${esc(s.id)}">Review setup →</button>${canStart(s)?`<button class="primary" data-start-setup="${esc(s.id)}">Start simulation</button>`:''}</div><p class="start-feedback" role="status"></p></article>`).join(''):'<p>No online setups saved yet. Create a world to choose its starting conditions.</p>';list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||!source.canConfigure||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an unavailable map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});
     list.querySelectorAll('[data-start-setup]').forEach(button=>{
       const setup=setups.find(s=>s.id===button.dataset.startSetup),feedback=button.closest('article').querySelector('.start-feedback');
-      try { const pending=readStart(setup); if(pending?.worldId){showStarted(button,feedback,pending.worldId);return;} if(pending){button.textContent='Retry original start';feedback.textContent='A previous start has not been confirmed. Retry uses its original saved conditions.';} }
+      try { const pending=readStart(setup); if(pending?.worldId){showStarted(button,feedback,pending.worldId);return;} if(pending){button.textContent=pending.pendingWorldId?'Continue setup':'Retry original start';feedback.textContent=pending.pendingWorldId?`This physical world is still initializing.${Number.isInteger(pending.appliedCommands)?` ${pending.appliedCommands} setup commands committed.`:''} Continue runs the next bounded setup batch with the original saved conditions.`:'A previous start has not been confirmed. Retry uses its original saved conditions.';} }
       catch(error){button.disabled=true;feedback.textContent=error.message;return;}
       button.onclick=()=>startSetup(setup,button,feedback,runtime);
     });
@@ -102,7 +115,16 @@ async function startSetup(setup,button,feedback,runtime) {
     sessionStorage.setItem(startKey(setup),JSON.stringify(record));
     const world=await api('/api/compute?action=create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record.payload)});
     if(!worldLink(world.id))throw new Error('The runtime returned an invalid simulation identifier.');
-    record.worldId=world.id;sessionStorage.setItem(startKey(setup),JSON.stringify(record));
+    if(world.available!==true){
+      record.pendingWorldId=world.id;
+      if(Number.isInteger(world.initialization?.appliedCommands))record.appliedCommands=world.initialization.appliedCommands;
+      sessionStorage.setItem(startKey(setup),JSON.stringify(record));
+      button.disabled=false;button.textContent='Continue setup';
+      feedback.textContent=`Physical world initialization is not complete (${world.state||'pending'}).${Number.isInteger(record.appliedCommands)?` ${record.appliedCommands} setup commands committed.`:''} Continue runs the next bounded setup batch. No simulated days can be advanced until initialization finishes.`;
+      if(runtime.isConnected)void loadWorlds(runtime);
+      return;
+    }
+    delete record.pendingWorldId;delete record.appliedCommands;record.worldId=world.id;sessionStorage.setItem(startKey(setup),JSON.stringify(record));
     showStarted(button,feedback,world.id);
     if(runtime.isConnected)void loadWorlds(runtime);
   }catch(error){feedback.textContent=`${error.message} The original start request is retained; retry it to recover the same simulation.`;button.disabled=false;button.textContent='Retry original start';}
