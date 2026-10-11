@@ -5,6 +5,7 @@ import { readSession } from './shell-session.js';
 import { createConnectedPanel } from './world-control-connected.mjs';
 import { ConnectedCommandController } from './world-control-connected-state.mjs';
 import { clockIsManaged, connectedView } from './world-control-connected-view.mjs';
+import { createPremisePanel } from './world-control-premises.mjs';
 const $ = id => document.getElementById(id);
 let status = null, offset = 0, total = 0, reading = false;
 let connectedStatus = null, connectedCommands = null, connectedActor = null, canControl = false;
@@ -25,6 +26,7 @@ const controller = new AdvanceController(request);
 const events = createStormPanel($('event-panel'), request, () => controls());
 const sentiment = createSentimentPanel($('sentiment-panel'), request, () => controls(), readSession().then(value=>value.user?.id).catch(()=>null));
 const connected = createConnectedPanel($('connected-panel'), connectedAction);
+const premises = createPremisePanel($('premise-panel'), request);
 function message(value) { $('message').textContent = value; }
 function controls() {
   const managed = clockIsManaged(status), sending = controller.busy || connectedCommands?.busy || connectedPreflight;
@@ -94,6 +96,7 @@ async function loadWorld(id) {
   clearTimeout(pollTimer); pollRemaining = 0;
   events.clear();
   sentiment.clear();
+  premises.clear();
   connected.clear(); connectedStatus = null; connectedCommands = null; connectedActor = null; canControl = false;
   reading = true; render(null); controls();
   try {
@@ -109,7 +112,7 @@ async function loadWorld(id) {
       } catch (error) { canControl = false; message(error.message); }
       try { connectedStatus = await request('connected',{id}); render(value); } catch (error) { message(error.message); }
     }
-    if (value.available) {await events.load(value);await sentiment.load(value);}
+    if (value.available) {await events.load(value);await sentiment.load(value);await premises.load(value);}
     const url = new URL(location.href); url.searchParams.set('id', id); history.replaceState(null, '', url);
     if (!value.available) message(value.error || 'Saved world is unavailable.');
     else if (!clockIsManaged(value)) message('Saved physical world loaded. Virtual Systems is not required.');

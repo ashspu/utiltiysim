@@ -15,7 +15,7 @@ export function createPageAccess({ env = process.env, client = cfg => new WorkOS
     const url = new URL(request.url);
     let path;
     try { path = decodeURIComponent(url.pathname); } catch { return new Response('Invalid path', {status:400}); }
-    if (publicPaths.has(path) || path.startsWith('/api/auth/') || path === '/api/runtime' || path === '/api/setups' || path === '/api/compute' || path.startsWith('/atlas/api/')) return pass();
+    if (publicPaths.has(path) || path.startsWith('/api/auth/') || path === '/api/runtime' || path === '/api/setups' || path === '/api/compute' || path === '/api/operator' || path.startsWith('/atlas/api/')) return pass();
     const headers = new Headers({'Cache-Control':'private, no-store','Vercel-CDN-Cache-Control':'no-store'});
     const pending = new Map();
     const res = { getHeader: key => pending.get(key), setHeader: (key,value) => pending.set(key,value) };
