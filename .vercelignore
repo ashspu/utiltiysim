@@ -1,12 +1,13 @@
 # Vercel serves the static town shell. The physical world and billing databases
 # run in the separately configured persistent runtime.
-/api
+/api/*.py
 /utilsim
 /tests
 /scripts/*.py
 /pyproject.toml
 /uv.lock
 /out
+/public
 /.utilsim_cache
 /.venv
 /examples

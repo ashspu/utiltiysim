@@ -9,7 +9,7 @@ const web = path.join(repo, 'prototypes/civic-atlas/web');
 const catalog = JSON.parse(fs.readFileSync(path.join(web, 'presets/catalog.json'), 'utf8'));
 const townIds = new Set(catalog.presets.map(p => p.id));
 const presetFiles = new Set(['tiles.json', 'premise-index.json', 'landmarks.json', 'overview.webp', 'overview.json', 'geometry-overview.webp']);
-const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js']);
+const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js', 'landing.html', 'landing.js', 'landing.css', 'shell-session.js']);
 if (!fs.existsSync(path.join(web, 'library.html'))) throw new Error('Town-library shell is not built.');
 for (const town of catalog.presets) {
   const folder = path.join(web, 'presets', town.id);
@@ -43,7 +43,12 @@ fs.cpSync(web, out, {recursive: true, filter(source) {
   if (!townIds.has(relative[1])) return false;
   return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]);
 }});
-fs.copyFileSync(path.join(web, 'library.html'), path.join(out, 'index.html'));
+fs.copyFileSync(path.join(web, 'landing.html'), path.join(out, 'index.html'));
+// Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.
+for (const file of ['index.html', 'library.html']) {
+  const target = path.join(out, file);
+  fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replace('<head>', '<head><meta name="utilitysim-hosted" content="true">'));
+}
 fs.cpSync(path.join(repo, 'site'), path.join(out, 'download'), {recursive: true});
 fs.cpSync(path.join(repo, 'packages/town-viewer/dist/brand'), path.join(out, 'brand'), {recursive: true});
 fs.cpSync(path.join(repo, 'packages/town-viewer/dist/brand'), path.join(out, 'download/brand'), {recursive: true});

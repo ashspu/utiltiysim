@@ -1,0 +1,13 @@
+{
+  "name": "utilitysim-shell",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:auth": "node --test tests/shell-auth/*.test.mjs",
+    "build": "node scripts/build_site.mjs"
+  },
+  "dependencies": {
+    "@workos-inc/node": "11.0.0",
+    "iron-session": "9.0.1"
+  }
+}

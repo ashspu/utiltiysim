@@ -1,8 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm ci --prefix packages/town-viewer",
+  "installCommand": "npm ci && npm ci --prefix packages/town-viewer",
   "buildCommand": "node scripts/build_site.mjs",
   "outputDirectory": "public",
-  "cleanUrls": false
+  "cleanUrls": false,
+  "rewrites": [{ "source": "/atlas/api/:path*", "destination": "/api/runtime?path=:path*" }],
+  "headers": [{ "source": "/api/:path*", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] }]
 }
