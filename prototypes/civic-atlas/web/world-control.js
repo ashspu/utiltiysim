@@ -1,5 +1,7 @@
 import { addDays, dateValue, AdvanceController } from './world-control-core.mjs';
 import { createStormPanel } from './world-control-events.mjs';
+import { createSentimentPanel, commandPanelsLocked } from './world-control-sentiment.mjs';
+import { readSession } from './shell-session.js';
 const $ = id => document.getElementById(id);
 let status = null, offset = 0, total = 0, reading = false;
 const catalogSources = fetch('/api/setups?view=catalog',{cache:'no-store'}).then(async response => response.ok ? (await response.json()).sources : []).catch(()=>[]);
@@ -15,18 +17,26 @@ async function request(action, params = {}, body) {
 }
 const controller = new AdvanceController(request);
 const events = createStormPanel($('event-panel'), request, () => controls());
+const sentiment = createSentimentPanel($('sentiment-panel'), request, () => controls(), readSession().then(value=>value.user?.id).catch(()=>null));
 function message(value) { $('message').textContent = value; }
 function controls() {
-  $('controls').disabled = !status?.available || reading || controller.busy || controller.uncertain || events.locked;
+  $('controls').disabled = !status?.available || reading || controller.busy || controller.uncertain || commandPanelsLocked(events,sentiment);
   $('observations').disabled = !status?.available || reading || controller.busy || !status.days;
-  $('open').disabled = reading || controller.busy || events.locked;
-  $('world').disabled = reading || controller.busy || events.locked;
-  $('refresh').disabled = reading || controller.busy || events.locked;
-  events.setClockBusy(reading || controller.busy || controller.uncertain);
+  $('open').disabled = reading || controller.busy || events.locked || sentiment.locked;
+  $('world').disabled = reading || controller.busy || events.locked || sentiment.locked;
+  $('refresh').disabled = reading || controller.busy || events.locked || sentiment.locked;
+  events.setClockBusy(reading || controller.busy || controller.uncertain || sentiment.locked);
+  sentiment.setClockBusy(reading || controller.busy || controller.uncertain || events.locked);
 }
 function render(value) {
   // Never show a previously selected world's state beneath another identity.
   status = value;
+  $('profile-summary').textContent='';
+  const profile=value?.physicalProfiles;
+  if(value?.available&&profile?.enabled){
+    const housing=profile.housing;
+    $('profile-summary').textContent=[profile.meterChannelsEnabled?`Applied meter collections: AMI ${profile.meterCounts?.AMI??0}, AMR ${profile.meterCounts?.AMR??0}, manual ${profile.meterCounts?.MANUAL??0}.`:'',profile.housingAgeEnabled&&housing?.count?`Applied housing: ${housing.count} homes, ages ${housing.minAgeYears}–${housing.maxAgeYears} years, realised mean ${housing.meanAgeYears} years; ${housing.retrofittedCount} retrofitted (${housing.retrofittedPercent}%).`:''].filter(Boolean).join(' ');
+  }
   $('world-map').hidden = true;
   if(value) void catalogSources.then(sources=>{
     const source=sources.find(source=>source.id===value.sourceId&&source.sourceRevision===value.sourceRevision&&source.snapshotSha256===value.snapshotSha256);
@@ -52,13 +62,14 @@ function render(value) {
   controls();
 }
 async function loadWorld(id) {
-  if (!id || reading || controller.busy || events.locked) return;
+  if (!id || reading || controller.busy || commandPanelsLocked(events,sentiment)) return;
   events.clear();
+  sentiment.clear();
   reading = true; render(null); controls();
   try {
     const value = await request('status', { id });
     controller.recovered(); render(value);
-    if (value.available) await events.load(value);
+    if (value.available) {await events.load(value);await sentiment.load(value);}
     const url = new URL(location.href); url.searchParams.set('id', id); history.replaceState(null, '', url);
     message(value.available ? 'Saved physical world loaded. Virtual Systems is not required.' : value.error || 'Saved world is unavailable.');
   } catch (error) { message(error.message); }
@@ -79,7 +90,7 @@ async function list() {
   } catch (error) { message(`${error.message} Configure the compute connection to open persistent simulations.`); }
 }
 async function advance(target) {
-  if (!status || reading || controller.busy || controller.uncertain || events.locked) return;
+  if (!status || reading || controller.busy || controller.uncertain || commandPanelsLocked(events,sentiment)) return;
   const saved = status;
   try {
     const pending = controller.advance(saved.id, saved.through, target);
@@ -87,6 +98,7 @@ async function advance(target) {
     const value = await pending;
     render(value); $('progress').textContent = `Saved cursor: ${value.through}.`;
     await events.load(value);
+    await sentiment.load(value);
     message('Physical time advanced and committed.');
   } catch (error) {
     $('progress').textContent = error.message;

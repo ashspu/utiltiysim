@@ -44,7 +44,7 @@ export function validatePhysicalValues(schema, value) {
     if (multiple && Math.abs(next / multiple - Math.round(next / multiple)) > 1e-8) errors.push({ path, message: `Use multiples of ${multiple}.` });
   }
   const supported = new Set(physicalFields(schema).map(field => field.path));
-  for (const mix of schema['x-distributions'] || []) {
+  for (const mix of physicalDistributions(schema)) {
     if (!mix.paths.every(path => supported.has(path))) continue;
     const total = mix.total ?? 100, sum = mix.paths.reduce((sum, path) => sum + getPath(value, path), 0);
     if (!Number.isFinite(sum) || Math.abs(sum - total) > 1e-8) errors.push({ paths: mix.paths, message: `${mix.title || 'Linked mix'} must total ${total}; current total ${Number.isFinite(sum) ? Number(sum.toFixed(8)) : 'incomplete'}.` });
@@ -55,13 +55,24 @@ export function validatePhysicalValues(schema, value) {
   return errors;
 }
 export function configurationFormSchema(configuration, saved) {
-  const properties = {world:configuration.schemas.world};
-  if(saved.schemaVersion==='physical-setup/2'&&configuration.schemas.physical)properties.physical=configuration.schemas.physical;
+  const version=saved.schemaVersion;
+  const source=configuration.supportedVersions?.[version] || configuration;
+  if(version&&version!==configuration.defaults.schemaVersion&&!configuration.supportedVersions?.[version])throw new Error('This saved setup version is unavailable. Its values are preserved.');
+  const properties = {world:source.schemas.world};
+  if(version&&source.schemas.physical)properties.physical=source.schemas.physical;
   return {type:'object',properties,...(properties.physical?{'x-requires':[{when:'physical.householdCashflow.enabled',path:'physical.householdFinance.enabled',message:'Recurring household cashflow requires household finances to be enabled.'}]}:{})};
 }
 export function upgradePhysicalConfiguration(saved, defaults) {
-  if(defaults.schemaVersion!=='physical-setup/2'||!defaults.physical)throw new Error('Customer settings are not supported by the current catalog.');
-  return {...clone(defaults),world:clone(saved.world)};
+  if(!defaults.schemaVersion||!defaults.physical)throw new Error('Additional physical settings are not supported by the current catalog.');
+  const next=clone(defaults);next.world=clone(saved.world);
+  for(const [group,value] of Object.entries(saved.physical||{}))if(Object.hasOwn(next.physical,group))next.physical[group]=clone(value);
+  return next;
+}
+export function physicalDistributions(schema,prefix=''){
+  const result=[...(schema['x-distributions']||[])];
+  if(schema['x-control']?.kind==='linked-percentages')result.push({title:schema.title,paths:schema['x-control'].fields.map(field=>prefix?`${prefix}.${field}`:field),total:schema['x-control'].total??100});
+  for(const [key,field] of Object.entries(schema.properties||{}))if(field.type==='object'&&field['x-supported']!==false)result.push(...physicalDistributions(field,prefix?`${prefix}.${key}`:key));
+  return result;
 }
 export function sliderExtent(field, value) {
   let step = field['x-control']?.step ?? field['x-step'] ?? field.multipleOf ?? (field.type === 'integer' ? 1 : 'any');
@@ -106,6 +117,7 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
   }
   container.append(toolbar);
   const summary = make('p'); summary.className = 'physical-errors'; summary.setAttribute('role', 'status'); summary.setAttribute('aria-live', 'polite');
+  const totals=make('p');totals.setAttribute('role','status');container.append(totals);
   const groups = new Map();
   for (const { path, schema: field } of physicalFields(schema)) {
     const groupPath = path.split('.').slice(0,-1).join('.');
@@ -171,6 +183,7 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
       control.slider.setAttribute('aria-valuetext', `${Number.isFinite(next) ? next : 'unset'}${unit || ''}${band?.label ? ` · ${band.label}` : ''}`);
     }
     summary.textContent = errors.length ? 'Complete the highlighted values before saving.' : '';
+    totals.textContent=physicalDistributions(schema).map(mix=>`${mix.title||'Linked mix'}: ${Number(mix.paths.reduce((sum,path)=>sum+getPath(values,path),0).toFixed(8))} / ${mix.total??100}`).join(' · ');
   }
   function apply(preset = {}) { values = restorePhysicalPreset(schema, defaults, preset); update(); options.onChange?.(clone(values), validatePhysicalValues(schema, values)); }
   restore.onclick = () => apply(); update();

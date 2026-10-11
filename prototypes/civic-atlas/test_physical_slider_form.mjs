@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { physicalFields, physicalDefaults, validatePhysicalValues, restorePhysicalPreset, sliderExtent, configurationFormSchema, upgradePhysicalConfiguration, physicalChoiceLabel } from './web/physical-slider-form.mjs';
+import { physicalFields, physicalDefaults, validatePhysicalValues, restorePhysicalPreset, sliderExtent, configurationFormSchema, upgradePhysicalConfiguration, physicalChoiceLabel, physicalDistributions } from './web/physical-slider-form.mjs';
 const share = { type: 'number', minimum: 0, maximum: 100, multipleOf: .1 };
 const schema = { type: 'object', properties: {
   meters: { type: 'object', properties: { ami: { ...share, default: 60 }, amr: { ...share, default: 30 }, manual: { ...share, default: 10 }, invented: { type: 'number', default: 7, 'x-supported': false } } },
@@ -93,4 +93,19 @@ test('cashflow choices use engine labels and server labels take precedence',()=>
   assert.equal(physicalChoiceLabel('insufficientCashPolicy',{},'all-or-nothing'),'Spend only if the whole expense is covered');
   assert.equal(physicalChoiceLabel('insufficientCashPolicy',{'x-control':{optionLabels:{'available-cash':'Server label'}}},'available-cash'),'Server label');
   assert.equal(physicalChoiceLabel('otherChoice',{},'available-cash'),'available-cash');
+});
+test('version registry preserves old fields and upgrades only through an explicit defaults merge',()=>{
+  const latest=structuredClone(configuration);latest.defaults.schemaVersion='physical-setup/4';
+  latest.defaults.physical.customerSentiment={enabled:false,initialTrust:75};
+  latest.schemas.physical.properties.customerSentiment={type:'object',properties:{enabled:{type:'boolean',default:false},initialTrust:{type:'number',default:75}}};
+  latest.supportedVersions={'physical-setup/2':configuration};
+  const saved=structuredClone(configuration.defaults);saved.physical.householdFinance.cash=333;
+  const old=configurationFormSchema(latest,saved);assert.equal(physicalFields(old).some(field=>field.path.includes('customerSentiment')),false);
+  assert.deepEqual(restorePhysicalPreset(old,configuration.defaults,saved).physical,saved.physical);
+  const upgraded=upgradePhysicalConfiguration(saved,latest.defaults);assert.equal(upgraded.schemaVersion,'physical-setup/4');assert.equal(upgraded.physical.householdFinance.cash,333);assert.equal(upgraded.physical.customerSentiment.enabled,false);
+});
+test('recursive linked-percentages metadata validates total without reallocating',()=>{
+  const schema={properties:{physical:{type:'object',properties:{mix:{type:'object',title:'Collection mix','x-control':{kind:'linked-percentages',fields:['ami','manual'],total:100},properties:{ami:{type:'number',default:80},manual:{type:'number',default:20}}}}}}};
+  const values=physicalDefaults(schema);assert.equal(physicalDistributions(schema)[0].paths[0],'physical.mix.ami');assert.deepEqual(validatePhysicalValues(schema,values),[]);
+  values.physical.mix.ami=75;assert.match(validatePhysicalValues(schema,values)[0].message,/current total 95/);assert.equal(values.physical.mix.manual,20);
 });

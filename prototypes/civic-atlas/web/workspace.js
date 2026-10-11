@@ -54,14 +54,16 @@ function configure() {
   root.querySelector('#change-town').onclick=()=>{if(mayLeave()){dirty=false;draft=null;chooseTown();}};
   for(const [id,key] of [['world-name','name'],['world-start','start']])root.querySelector('#'+id).oninput=e=>{draft[key]=e.target.value;markDirty();};
   const note=root.querySelector('#setup-form .workspace-note');
-  const v2=draft.configuration.schemaVersion==='physical-setup/2';
-  note.textContent=v2?'Weather, meter condition and supported customer assumptions use the daily UTC clock. Enabled household settings apply uniformly to occupied residential households. Currency amounts use minor units: 100 units = 1 main currency unit.':'This saved setup uses the original weather and meter settings. It stays in its original format until you explicitly add customer settings.';
-  if(!v2&&catalog.configuration.defaults.schemaVersion==='physical-setup/2'&&catalog.configuration.schemas.physical){
-    const upgrade=document.createElement('button');upgrade.type='button';upgrade.textContent='Add customer settings';upgrade.onclick=()=>{draft.configuration=upgradePhysicalConfiguration(draft.configuration,catalog.configuration.defaults);markDirty();configure();};note.after(upgrade);
+  const version=draft.configuration.schemaVersion;
+  note.textContent=version?'Supported physical assumptions use the daily UTC clock. Household settings apply to occupied residential households. Currency amounts use minor units: 100 units = 1 main currency unit. Existing settings stay unchanged until an explicit upgrade.':'This saved setup uses the original weather and meter settings. It stays in its original format until you explicitly add physical settings.';
+  if(version!==catalog.configuration.defaults.schemaVersion&&catalog.configuration.schemas.physical){
+    const upgrade=document.createElement('button');upgrade.type='button';upgrade.textContent='Add meter, housing and sentiment settings';upgrade.onclick=()=>{draft.configuration=upgradePhysicalConfiguration(draft.configuration,catalog.configuration.defaults);markDirty();configure();};note.after(upgrade);
   }
   const schema=configurationFormSchema(catalog.configuration,draft.configuration);
-  const preserveVersion=values=>({...values,...(v2?{schemaVersion:'physical-setup/2'}:{})});
-  form=renderPhysicalSliderForm(root.querySelector('#physical-settings'),schema,{values:draft.configuration,defaults:v2?catalog.configuration.defaults:{world:catalog.configuration.defaults.world},onChange:values=>{draft.configuration=preserveVersion(values);markDirty();}});
+  const preserveVersion=values=>({...values,...(version?{schemaVersion:version}:{})});
+  const defaults=version?(catalog.configuration.supportedVersions?.[version]?.defaults||catalog.configuration.defaults):{world:catalog.configuration.defaults.world};
+  form=renderPhysicalSliderForm(root.querySelector('#physical-settings'),schema,{values:draft.configuration,defaults,onChange:values=>{draft.configuration=preserveVersion(values);markDirty();advise();}});
+  const advisory=document.createElement('p');advisory.className='workspace-note';const advise=()=>{advisory.textContent=draft.configuration.physical?.customerSentiment?.enabled&&!draft.configuration.physical?.customerContacts?.active?'Sentiment is enabled while customer contacts are off. Confidence history will change, but contact amplification requires the separately enabled contact behavior.':'';};root.querySelector('#physical-settings').after(advisory);root.querySelector('#physical-settings').addEventListener('input',advise);root.querySelector('#physical-settings').addEventListener('change',advise);advise();
   root.querySelector('#setup-form').onsubmit=e=>{e.preventDefault();if(form.validate().length||!e.target.reportValidity())return;draft.configuration=preserveVersion(form.values);review();};
 }
 function review() {
