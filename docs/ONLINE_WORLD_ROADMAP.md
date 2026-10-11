@@ -12,6 +12,14 @@ The old offline Studio wizard mixed these domains. Port its useful controls and 
 
 ### Approved implementation update, 11 October
 
+Latest verified checkpoint: the original river-town photo is restored behind the welcome text, with parallax chapters and the ecosystem diagram preserved. Canonical release `2b62d13` passed independent desktop/mobile/auth checks. Owner setup save → full reload → reopen passed against the dedicated free store. Configurable compute and event/time pages are live; no production runtime is connected.
+
+Physical setup v2 is integrated for release: 21 controls cover weather, meter condition, experienced-problem contacts, household finance and recurring cashflow. Household groups are opt-in and uniform across occupied residential properties. Old saved configurations retain their format until explicit upgrade. The real backend acceptance initialized 300 households with 601 commands in resumable batches (maximum measured request 5.344 seconds), then advanced two days, restarted, and verified 2,524 readings and actual cashflow without modifying any of 85 checked source files. The UI retains the original creation payload and offers continuation until initialization is complete. AMI/AMR/manual, house age and sentiment effects remain active backend work; they are not advertised as implemented controls.
+
+The implemented event/time UI passed a real browser → gateway → Python loop for storm scheduling, actual temperature effect, cancellation before start, process restart and seven-day advance. It operates independently of Virtual Systems. Durable jobs, pause/cancel of an active advance, cloud hosting/restore acceptance and VS recipient delivery remain open. Ash configures the compute connection; further maps still wait for completed and reviewed Ashtown plus its lessons.
+
+The checkpoint bullets below are retained as implementation history and are superseded by the verified status above.
+
 - Greg approved proceeding with GPT-6.1 Sol parallel agents. Ash will configure the compute endpoint and credential in UtilitySim; no compute host is being provisioned on his behalf.
 - The corrected full-map Harbour hero, original ecosystem diagram and authenticated setup entry are live. Independent canonical desktop/mobile checks passed. Draft save verification found a legacy Redis URL pointing to a website; a dedicated `utilitysim-setup-store` was then provisioned on the existing Vercel Upstash integration, free plan, automatic upgrades and eviction disabled. Cloud save/reload remains a release acceptance check until recorded as passed.
 - The configurable compute gateway, persistent Python runtime, real instance library and independent event/time controls are implemented in the integration branch. They require integrated acceptance; local implementation is not hosted compute.

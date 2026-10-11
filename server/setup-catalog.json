@@ -1,6 +1,7 @@
 {
   "schemaVersion": "utilitysim-setup-catalog/1",
   "configuration": {
+    "configurationVersion": "physical-setup/2",
     "schemas": {
       "world": {
         "type": "object",
@@ -14,24 +15,42 @@
                 "title": "Winter average",
                 "default": 2.0,
                 "x-unit": "°C",
-                "x-effect": "Sets the winter end of the seasonal daily temperature curve.",
-                "x-slider": {
-                  "min": -20,
-                  "max": 40
-                },
-                "x-step": 0.1
+                "x-control": {
+                  "kind": "slider",
+                  "displayMinimum": -30,
+                  "displayMaximum": 20,
+                  "step": 0.5,
+                  "labels": [
+                    "Colder winters",
+                    "Milder winters"
+                  ],
+                  "effect": "Changes daily weather and temperature-sensitive demand.",
+                  "allowExactInput": true,
+                  "referenceValue": 2.0,
+                  "referenceLabel": "Engine starting value",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
               },
               "summer_mean_c": {
                 "type": "number",
                 "title": "Summer average",
                 "default": 26.0,
                 "x-unit": "°C",
-                "x-effect": "Sets the summer end of the seasonal daily temperature curve.",
-                "x-slider": {
-                  "min": -20,
-                  "max": 50
-                },
-                "x-step": 0.1
+                "x-control": {
+                  "kind": "slider",
+                  "displayMinimum": 0,
+                  "displayMaximum": 45,
+                  "step": 0.5,
+                  "labels": [
+                    "Cooler summers",
+                    "Hotter summers"
+                  ],
+                  "effect": "Changes daily weather and cooling-sensitive demand.",
+                  "allowExactInput": true,
+                  "referenceValue": 26.0,
+                  "referenceLabel": "Engine starting value",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
               },
               "daily_weather_spread_c": {
                 "type": "number",
@@ -39,11 +58,21 @@
                 "default": 6.0,
                 "x-unit": "°C",
                 "minimum": 0,
-                "x-effect": "Controls how much daily temperature varies around the seasonal curve. Higher values mean more variable weather.",
-                "x-slider": {
-                  "max": 20
-                },
-                "x-step": 0.1
+                "x-control": {
+                  "kind": "slider",
+                  "displayMinimum": 0,
+                  "displayMaximum": 20,
+                  "step": 0.5,
+                  "labels": [
+                    "Steadier weather",
+                    "More variable weather"
+                  ],
+                  "effect": "Changes day-to-day temperature variation.",
+                  "allowExactInput": true,
+                  "referenceValue": 6.0,
+                  "referenceLabel": "Engine starting value",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
               }
             }
           },
@@ -58,8 +87,21 @@
                 "x-unit": "",
                 "minimum": 0,
                 "maximum": 1,
-                "x-effect": "Annual baseline chance used by the physical meter failure model. Higher values increase failure risk. 0.015 means 1.5%.",
-                "x-step": 0.001
+                "x-control": {
+                  "kind": "slider",
+                  "displayMinimum": 0,
+                  "displayMaximum": 0.2,
+                  "step": 0.001,
+                  "labels": [
+                    "More reliable meters",
+                    "More frequent failures"
+                  ],
+                  "effect": "Base annual failure probability; meter age further affects failures.",
+                  "allowExactInput": true,
+                  "referenceValue": 0.015,
+                  "referenceLabel": "Engine starting value",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
               },
               "annual_meter_drift": {
                 "type": "number",
@@ -68,8 +110,341 @@
                 "x-unit": "",
                 "minimum": 0,
                 "maximum": 1,
-                "x-effect": "Annual probability used for physical meter drift onset. Higher values increase drift risk. 0.01 means 1%.",
-                "x-step": 0.001
+                "x-control": {
+                  "kind": "slider",
+                  "displayMinimum": 0,
+                  "displayMaximum": 0.2,
+                  "step": 0.001,
+                  "labels": [
+                    "Less drift",
+                    "More drift"
+                  ],
+                  "effect": "Controls how often healthy meters develop measurement drift.",
+                  "allowExactInput": true,
+                  "referenceValue": 0.01,
+                  "referenceLabel": "Engine starting value",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              }
+            }
+          }
+        }
+      },
+      "physical": {
+        "type": "object",
+        "title": "Physical and customer assumptions",
+        "additionalProperties": false,
+        "properties": {
+          "customerContacts": {
+            "type": "object",
+            "title": "Customer reactions to physical problems",
+            "additionalProperties": false,
+            "properties": {
+              "active": {
+                "type": "boolean",
+                "title": "Enable this world behavior",
+                "default": false,
+                "x-control": {
+                  "kind": "toggle"
+                }
+              },
+              "noticeProbabilityPerDay": {
+                "type": "number",
+                "title": "Daily chance of noticing an experienced problem",
+                "default": 0.5,
+                "minimum": 0,
+                "maximum": 1,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 0.01,
+                  "unit": "probability",
+                  "allowExactInput": true,
+                  "referenceValue": 0.5,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Less likely to contact",
+                    "More likely to contact"
+                  ],
+                  "effect": "Higher values can produce earlier contact intentions after experienced supply loss or visible overflow.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "deliveryDelaySeconds": {
+                "type": "integer",
+                "title": "Delay before a customer contact becomes available",
+                "default": 86400,
+                "minimum": 0,
+                "maximum": 31622400,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 3600,
+                  "unit": "seconds",
+                  "allowExactInput": true,
+                  "referenceValue": 86400,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Sooner",
+                    "Later"
+                  ],
+                  "effect": "Delays the customer contact evidence; this is not a call-centre processing queue.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "repeatAfterDays": {
+                "type": "integer",
+                "title": "Days before another contact about the same episode",
+                "default": 3,
+                "minimum": 1,
+                "maximum": 365,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 1,
+                  "unit": "days",
+                  "allowExactInput": true,
+                  "referenceValue": 3,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "More frequent repeats",
+                    "Less frequent repeats"
+                  ],
+                  "effect": "Shorter intervals permit more frequent repeat contacts while the experienced problem persists.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "maxContacts": {
+                "type": "integer",
+                "title": "Maximum contacts per experienced episode",
+                "default": 3,
+                "minimum": 1,
+                "maximum": 10,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 1,
+                  "unit": "contacts",
+                  "allowExactInput": true,
+                  "referenceValue": 3,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Fewer repeats",
+                    "More repeats"
+                  ],
+                  "effect": "Caps repeated customer contact intentions for one episode.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              }
+            }
+          },
+          "householdFinance": {
+            "type": "object",
+            "title": "Household finances and payment behavior",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "Configure occupied residential households",
+                "default": false,
+                "x-control": {
+                  "kind": "toggle"
+                }
+              },
+              "cashCents": {
+                "type": "integer",
+                "title": "Starting household cash",
+                "default": 200000,
+                "minimum": 0,
+                "maximum": 100000000,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 10000,
+                  "unit": "minor currency units",
+                  "allowExactInput": true,
+                  "referenceValue": 200000,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Smaller cash cushion",
+                    "Larger cash cushion"
+                  ],
+                  "effect": "Sets each eligible household's initial cash; it is not an enterprise account balance.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "essentialReserveCents": {
+                "type": "integer",
+                "title": "Cash protected from utility-payment intentions",
+                "default": 50000,
+                "minimum": 0,
+                "maximum": 100000000,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 5000,
+                  "unit": "minor currency units",
+                  "allowExactInput": true,
+                  "referenceValue": 50000,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Less protected cash",
+                    "More protected cash"
+                  ],
+                  "effect": "Higher reserves protect more household cash and can reduce money available for utility payments.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "maxPaymentCents": {
+                "type": "integer",
+                "title": "Maximum amount per payment intention",
+                "default": 50000,
+                "minimum": 1,
+                "maximum": 100000000,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 1000,
+                  "unit": "minor currency units",
+                  "allowExactInput": true,
+                  "referenceValue": 50000,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Smaller payments",
+                    "Larger payments"
+                  ],
+                  "effect": "Caps a household payment intention after a trusted invoice has been received.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "paymentProbability": {
+                "type": "number",
+                "title": "Daily payment attempt probability",
+                "default": 0.75,
+                "minimum": 0,
+                "maximum": 1,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 0.01,
+                  "unit": "probability",
+                  "allowExactInput": true,
+                  "referenceValue": 0.75,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Less likely to attempt",
+                    "More likely to attempt"
+                  ],
+                  "effect": "Applies only to received known obligations with available cash; does not create bills or post enterprise payments.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              }
+            }
+          },
+          "householdCashflow": {
+            "type": "object",
+            "title": "Recurring household income and essential expenses",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "Enable recurring cashflow (requires household finances)",
+                "default": false,
+                "x-control": {
+                  "kind": "toggle"
+                }
+              },
+              "incomeCents": {
+                "type": "integer",
+                "title": "Income per occurrence",
+                "default": 300000,
+                "minimum": 0,
+                "maximum": 100000000,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 10000,
+                  "unit": "minor currency units",
+                  "allowExactInput": true,
+                  "referenceValue": 300000,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Less income",
+                    "More income"
+                  ],
+                  "effect": "Adds income on each configured interval, starting on the world start date.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "incomeIntervalDays": {
+                "type": "integer",
+                "title": "Income interval",
+                "default": 30,
+                "minimum": 1,
+                "maximum": 366,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 1,
+                  "unit": "UTC days",
+                  "allowExactInput": true,
+                  "referenceValue": 30,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "More frequent",
+                    "Less frequent"
+                  ],
+                  "effect": "Uses a fixed day interval, not calendar months.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "expenseCents": {
+                "type": "integer",
+                "title": "Essential expenses per occurrence",
+                "default": 240000,
+                "minimum": 0,
+                "maximum": 100000000,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 10000,
+                  "unit": "minor currency units",
+                  "allowExactInput": true,
+                  "referenceValue": 240000,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "Lower expense pressure",
+                    "Higher expense pressure"
+                  ],
+                  "effect": "Consumes household cash for non-utility essentials; unfunded expense is recorded.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "expenseIntervalDays": {
+                "type": "integer",
+                "title": "Essential-expense interval",
+                "default": 30,
+                "minimum": 1,
+                "maximum": 366,
+                "x-control": {
+                  "kind": "slider",
+                  "step": 1,
+                  "unit": "UTC days",
+                  "allowExactInput": true,
+                  "referenceValue": 30,
+                  "referenceLabel": "Illustrative starting assumption",
+                  "labels": [
+                    "More frequent",
+                    "Less frequent"
+                  ],
+                  "effect": "Shorter intervals create more frequent household expense pressure.",
+                  "severityBasis": "relative-to-starting-assumption"
+                }
+              },
+              "insufficientCashPolicy": {
+                "type": "string",
+                "title": "When essential expenses exceed available cash",
+                "enum": [
+                  "available-cash",
+                  "all-or-nothing"
+                ],
+                "default": "available-cash",
+                "x-control": {
+                  "kind": "select",
+                  "optionLabels": {
+                    "available-cash": "Spend available cash; record the unpaid remainder",
+                    "all-or-nothing": "Skip an unaffordable expense; record the full amount unpaid"
+                  }
+                }
               }
             }
           }
@@ -77,6 +452,7 @@
       }
     },
     "defaults": {
+      "schemaVersion": "physical-setup/2",
       "world": {
         "weather": {
           "winter_mean_c": 2.0,
@@ -87,7 +463,40 @@
           "annual_meter_failure": 0.015,
           "annual_meter_drift": 0.01
         }
+      },
+      "physical": {
+        "customerContacts": {
+          "active": false,
+          "noticeProbabilityPerDay": 0.5,
+          "deliveryDelaySeconds": 86400,
+          "repeatAfterDays": 3,
+          "maxContacts": 3
+        },
+        "householdFinance": {
+          "enabled": false,
+          "cashCents": 200000,
+          "essentialReserveCents": 50000,
+          "maxPaymentCents": 50000,
+          "paymentProbability": 0.75
+        },
+        "householdCashflow": {
+          "enabled": false,
+          "incomeCents": 300000,
+          "incomeIntervalDays": 30,
+          "expenseCents": 240000,
+          "expenseIntervalDays": 30,
+          "insufficientCashPolicy": "available-cash"
+        }
       }
+    },
+    "scope": {
+      "householdPolicies": "Uniform initial assumptions for occupied residential premises only",
+      "currency": "Minor currency units; no currency conversion or enterprise tariff configuration",
+      "unsupportedRequiredControls": [
+        "AMI/AMR/manual channel effects",
+        "housing age effects",
+        "customer sentiment feedback"
+      ]
     }
   },
   "sources": [

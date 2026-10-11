@@ -144,7 +144,7 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
       const next = getPath(values, path), baseline = getPath(defaults, path);
       if(!control.slider){
         if(control.field.type==='boolean')control.exact.checked=next===true;else control.exact.value=next??'';
-        control.marker.textContent=`Default: ${control.field.type==='boolean'?(baseline?'Enabled':'Disabled'):baseline}${next===baseline?' · current value':''}`;
+        control.marker.textContent=`Default: ${control.field.type==='boolean'?(baseline?'Enabled':'Disabled'):physicalChoiceLabel(path,control.field,baseline)}${next===baseline?' · current value':''}`;
         const relevant=errors.filter(error=>error.path===path||error.paths?.includes(path));control.error.textContent=relevant.map(error=>error.message).join(' ');control.exact.setAttribute('aria-invalid',String(!!relevant.length));continue;
       }
       const extent = sliderExtent(control.field, next), unit=control.field['x-control']?.unit ?? control.field['x-unit'];
