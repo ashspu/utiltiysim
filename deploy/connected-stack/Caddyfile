@@ -1,0 +1,15 @@
+{
+    admin off
+    auto_https off
+}
+
+https://{$PRODUCER_HOST}:8443 {
+    tls /tls/fullchain.pem /tls/privatekey.pem
+    @hosted path /hosted/*
+    handle @hosted {
+        reverse_proxy producer:8080
+    }
+    handle {
+        respond "Route unavailable" 404
+    }
+}

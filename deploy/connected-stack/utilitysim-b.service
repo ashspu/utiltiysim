@@ -1,0 +1,19 @@
+[Unit]
+Description=UtilitySim B connected single-host stack
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+RequiresMountsFor=/srv/utilitysim-b/data
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/utilitysim-b/deploy/connected-stack
+ExecStart=/usr/bin/python3 /opt/utilitysim-b/deploy/connected-stack/stack.py up --config /etc/utilitysim-b/deployment.json
+ExecStop=/usr/bin/python3 /opt/utilitysim-b/deploy/connected-stack/stack.py stop --config /etc/utilitysim-b/deployment.json
+TimeoutStartSec=240
+TimeoutStopSec=240
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

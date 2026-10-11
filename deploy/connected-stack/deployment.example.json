@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "utilitysim-connected-stack/1",
+  "readiness": "candidate",
+  "recoveryMode": "owner-cli-stopped/1",
+  "ownerCli": {
+    "directory": "/data",
+    "remoteConfig": "/data/remote-world.json",
+    "controllerId": null,
+    "worldId": null,
+    "port": 8027,
+    "serviceTokenEnv": "CONNECTED_SERVICE_TOKEN",
+    "clockTokenEnv": "CONNECTED_CLOCK_TOKEN"
+  },
+  "runId": null,
+  "fieldEnabled": false,
+  "volumeId": null,
+  "producerHost": null,
+  "dataRoot": "/srv/utilitysim-b/data",
+  "tlsDirectory": "/etc/utilitysim-b/tls",
+  "backupDirectory": "/srv/utilitysim-b-backups",
+  "ageRecipient": null,
+  "ownerFiles": {
+    "world": {"service": "producer", "path": null},
+    "producerField": {"service": "producer", "path": null},
+    "catalog": {"service": "producer", "path": "world-library.sqlite"},
+    "runtime": {"service": "controller", "path": null},
+    "billing": {"service": "controller", "path": null},
+    "ledger": {"service": "controller", "path": null},
+    "evidence": {"service": "controller", "path": null},
+    "controller": {"service": "controller", "path": "control.sqlite"}
+  },
+  "services": {
+    "producer": {
+      "image": null,
+      "sourceCommit": "3ffcc40c440f425cecdae37e7fd7f4c6537caf85",
+      "secretsFile": "/etc/utilitysim-b/producer.json",
+      "requiredSecrets": ["UTILITYSIM_RUNTIME_TOKEN", "UTILITYSIM_MACHINE_KEY", "UTILITYSIM_CONTROLLER_TOKEN", "UTILITYSIM_CONTROLLER_URL", "UTILITYSIM_CONTROLLER_ALLOW_HTTP", "UTILITYSIM_CONTROLLER_ID"],
+      "command": ["uvicorn", "utilsim.hosted.server:from_environment", "--factory", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"],
+      "healthCommand": ["python", "/ops/owners.py", "producer-health"]
+    },
+    "controller": {
+      "image": null,
+      "sourceCommit": "de78127334098e980389169761ba18b4687d7db5",
+      "secretsFile": "/etc/utilitysim-b/controller.json",
+      "requiredSecrets": ["CONNECTED_SERVICE_TOKEN", "CONNECTED_CLOCK_TOKEN"],
+      "command": ["python", "/ops/owners.py", "serve"],
+      "healthCommand": ["python", "/ops/owners.py", "health"],
+      "pauseCommand": [],
+      "checkpointCommand": []
+    },
+    "edge": {"image": null}
+  },
+  "evidence": {
+    "producerContainerAcceptance": null,
+    "controllerConnectedAcceptance": null,
+    "intervalCompatibilityCommit": "17c9e4ffd685fa0d8fc7d8a0593f5fbf55863eff",
+    "linuxRestoreAcceptance": null
+  }
+}

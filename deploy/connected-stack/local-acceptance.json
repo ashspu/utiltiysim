@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "connected-owner-interface-drill/1",
+  "result": "passed-local-original-path-restore",
+  "liveWorkerBackupRefused": true,
+  "executedPauseAndReleasedLease": true,
+  "stoppedVsInventory": true,
+  "actualProducerBackup": true,
+  "producerVsIdentityReconciled": true,
+  "combinedArchiveVerifiedUnpack": true,
+  "producerAuthenticatedHealthAndOriginalBinding": true,
+  "controlRevision": 3,
+  "ownerFiles": 8,
+  "pendingOriginalJobs": 2,
+  "authenticatedResumeAndExactReplay": true,
+  "physicalDays": 2,
+  "uniqueBillingReads": 8,
+  "testedSourceCommits": {
+    "producer": "3ffcc40c440f425cecdae37e7fd7f4c6537caf85",
+    "privateVs": "de78127334098e980389169761ba18b4687d7db5"
+  },
+  "sourceFileSha256": {
+    "producer/utilsim/hosted/backup.py": "ca1cfab1206d1a6b166e69971e9a27b439fc1e68fa0fd480c7f54b6936a3dd14",
+    "producer/utilsim/hosted/server.py": "08e309d44a9b770b9e6444e9115dacb5536286a8220a16e421ebced6044a076f",
+    "producer/utilsim/hosted/machine.py": "eb7e34b2ff841b6d3428d11b0ceea5b3ff2597753b8442010e4baaa588cf7d0c",
+    "producer/utilsim/hosted/machine_routes.py": "72dce72f8688b10ff4eca611adb49144e35c3ae36ac3d6e7b29797ed3a9ff41f",
+    "producer/utilsim/hosted/health.py": "a9b9cc13c8e50ab0a95aa799cd72b4ed782b4afb8a6e0a9832943b65f05ecc75",
+    "private-vs/connected/__main__.py": "71d141fb2ea9cb7542d094b72fe42ba82d8373dca3f0e2fae63ae7d3bbbcb768",
+    "private-vs/connected/runtime.py": "837c46dd23e43171f746989d829d725825fef77a7c7eb6c4ac0eccc1ae4d9162",
+    "private-vs/connected/service.py": "19c59dc589c43bb59f8d82877462f79292734bbd3607a0eb251606b867ccb0eb",
+    "private-vs/connected/controller.py": "f7374f9bd2f089b53b28df95ad20bdd29163e72793b31c7a022528c97fb8d08e",
+    "private-vs/connected/remote.py": "78332dc4f5b163fa298c97e5cce9b223faf1732a73ab1397913f5740ca85afaf"
+  },
+  "linuxDockerBoot": false,
+  "ageEncryption": false,
+  "originalPathApplicationRestore": true,
+  "linuxOriginalPathApplicationRestore": false,
+  "managedRemoteField": false,
+  "productionDeployed": false
+}

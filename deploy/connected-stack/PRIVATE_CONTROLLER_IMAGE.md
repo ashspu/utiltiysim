@@ -1,0 +1,17 @@
+# Private controller image handoff
+
+The authorized private VS checkout at `de78127334098e980389169761ba18b4687d7db5` has an executable `connected serve/status/backup-ready` contract. The disposable local acceptance passed actual HTTP and original-path application recovery. It has no Dockerfile or locked connected-runtime dependency bundle. Its existing `docs/DEPLOY.md` describes the older Flask/Vercel/Postgres deployment; it does not establish this persistent SQLite controller image.
+
+Private release owner must build the controller in an authorized private context and registry. This public repository must never receive that source, its credentials or a copied private working tree. Do not use an unrestricted `COPY .` against a working checkout containing runs, tokens or local configuration.
+
+Required build inputs and properties:
+
+- Approved private source revision, an explicit source allowlist/bundle manifest, and reviewed hash-locked dependencies for the connected CLI. Current `pyproject.toml` broad hosted dependencies are not a reproducible image lock. UTC local acceptance used Python3.11; use a reviewed Python3.11+ base pinned by digest and verify any required timezone data.
+- Include the actual `connected`, `synth_runtime`, `billing`, `receivables`, `customerflow`, `worldfeed`, `vscontracts`, `vsdb` modules and their transitive imports. The private owner determines the complete bundle from the actual connected entrypoint; this list is not a validated packaging allowlist.
+- UID/GID10001, working import path for the private bundle, no startup database/demo initialization, no baked credentials, no local database/run outputs, and an OCI source revision label. `/data` is supplied by the host at the pinned original path. `/ops` and `/config` are read-only deployment mounts; `/tmp` is tmpfs.
+- Entrypoint supplied by composition is `python /ops/stack.py launch controller`; the wrapper loads protected credential JSON and runs `python /ops/owners.py serve`. That calls the existing CLI with a temporary0600 service-token file, existing `/data` directory and pinned remote configuration. CLI binds loopback8027 in the producer network namespace.
+- Actual health invokes `python /ops/owners.py health`. Offline recovery invokes `controller-snapshot` with all services stopped, no network and the same original `/data`. Never substitute a successful socket check or VS-only inventory for complete combined recovery.
+
+Before supplying an image digest, the owner/host acceptance must run the Compose restrictions unchanged: read-only root, nonroot UID10001, capabilities dropped, internal network only, no public8027, no Docker socket, and existing mounted owners. Verify import/serve/health, missing/replaced-owner refusal, paused reopen, authenticated command identity, killed-worker exact retry, full stopped backup and original-path restore. Pin the resulting image digest and source revision in the operator configuration. A generated Dockerfile or successful import alone cannot populate `controllerConnectedAcceptance` or `linuxRestoreAcceptance`.
+
+The producer owner now supplies `python -m utilsim.hosted.health`; its actual local HTTP probe passed. Our producer health adapter adds read-only fixed catalog/world/run/controller checks using the same real health route, without waiting for controller startup. Producer Docker/Linux acceptance remains a separate owner gate.
