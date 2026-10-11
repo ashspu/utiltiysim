@@ -7,8 +7,11 @@ import hashlib
 import hmac
 import json
 import re
+import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from utilsim.world import contacts, cruise, customer_finance, customer_notices, delivery, field_execution
 from utilsim.world.store import canonical, stable
@@ -23,6 +26,32 @@ def text(value):
     if not isinstance(value, str) or not value.strip() or len(value) > 512:
         raise ValueError('Use nonempty text of at most 512 characters.')
     return value
+
+
+class ExistingFieldExecution(field_execution.FieldExecution):
+    """Open the registered sidecar without creating a missing/empty owner."""
+    def __init__(self, world, path, owner_id):
+        self.world, self.path, self.owner_id = world, str(path), owner_id
+        with world.read_db() as db:
+            meta = field_execution._world_identity(db)
+        binding = {**{key: meta[key] for key in ('environment', 'fingerprint')}, 'owner': owner_id}
+        with self.db() as db:
+            if not field_execution._owned_store(db, binding):
+                raise ValueError('Registered field owner is empty; restore the original sidecar.')
+
+    @contextmanager
+    def db(self):
+        db = sqlite3.connect(Path(self.path).resolve().as_uri() + '?mode=rw', uri=True, timeout=30)
+        db.row_factory = sqlite3.Row
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
 
 class MachinePort:
@@ -95,7 +124,14 @@ class MachinePort:
             with world.db() as db:
                 db.execute('CREATE TABLE IF NOT EXISTS machine_days('
                            'id TEXT PRIMARY KEY,through TEXT UNIQUE NOT NULL,request TEXT NOT NULL,result TEXT)')
-            self.field(world, owner['id'])
+            fresh_intent = (old is None or not old['active'] and old['revision'] == 1
+                            and json.loads(old['request']).get('expectedRevision') == 0)
+            if 'machineFieldOwnerId' not in meta and fresh_intent:
+                field = self.field(world, owner['id'])
+            else:
+                field = self.field_existing(world, owner['id'])
+            with world.db() as db:
+                world.put(db, 'machineFieldOwnerId', field.owner_id)
             with self.library.library.db() as db:
                 db.execute('UPDATE hosted_connections SET active=1 WHERE world=?', (owner['id'],))
         return {**self.marker(owner['id']), 'worldInstanceId': owner['id'], 'environmentId': meta['environment'],
@@ -146,6 +182,10 @@ class MachinePort:
         return field_execution.FieldExecution(world, self.library.root / 'worlds' / identity / 'machine-field.sqlite',
                                               owner_id='connected-' + identity)
 
+    def field_existing(self, world, identity):
+        return ExistingFieldExecution(world, self.library.root / 'worlds' / identity / 'machine-field.sqlite',
+                                      owner_id='connected-' + identity)
+
     def status(self, connection):
         world = self.world(connection)
         with world.read_db() as db:
@@ -193,7 +233,7 @@ class MachinePort:
             with world.read_db() as db:
                 through = world.metadata(db)['through']
             if through == day:
-                field_execution.run_due(self.field(world, connection['world']))
+                field_execution.run_due(self.field_existing(world, connection['world']))
                 world.advance(value['through'])
             with world.db() as db:
                 message = db.execute('SELECT id FROM observation_outbox WHERE day=?', (day,)).fetchone()
@@ -223,7 +263,7 @@ class MachinePort:
                 items.append({'cursor': row['sequence'], 'envelope': envelope, 'fingerprint': row['fingerprint']})
             page = {'items': items, 'nextAfter': items[-1]['cursor'] if len(rows) > limit else None}
         elif kind == 'field':
-            field = self.field(world, connection['world'])
+            field = self.field_existing(world, connection['world'])
             page = field_execution.ready(field, after, limit)
             allowed = []
             with field.db() as db:
@@ -258,7 +298,7 @@ class MachinePort:
         if kind not in FEEDS:
             raise ValueError('Unknown evidence feed.')
         world = self.world(connection)
-        store = self.field(world, connection['world']) if kind == 'field' else world
+        store = self.field_existing(world, connection['world']) if kind == 'field' else world
         table, state, digest = {
             'observations': ('observation_outbox', 'state', 'fingerprint'),
             'contacts': ('contact_outbox', 'state', 'fingerprint'),
@@ -339,7 +379,7 @@ class MachinePort:
         if kind == 'field':
             if 'actorId' in value:
                 raise ValueError('Field actor authority is supplied by the fixed-world broker.')
-            field = self.field(world, connection['world'])
+            field = self.field_existing(world, connection['world'])
             actor = 'world-admin'
             if value.get('action') == 'execute':
                 with field.db() as db:
