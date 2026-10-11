@@ -43,10 +43,11 @@ export function setValue(draft,data,fields,id,raw,{pin=true}={}){
  const f=fieldAt(fields,id);if(!f||f.disabled)throw Error('This setting is unavailable for the selected services.');
  const previous=valueOf(draft,data,f);
  const districtTotal=id==='town:town.houses'&&draft.guidedSetup.mode==='studio'&&draft.execution==='local';
- const result=parseField(districtTotal?{...f,max:500000}:f,raw);if(!result.ok)throw Error(result.error);
- if(id==='town:town.houses'&&draft.guidedSetup.mode==='world'&&result.value>data.homeLimit)throw Error(`A saved world supports at most ${data.homeLimit.toLocaleString()} homes. Choose Studio year for larger district runs.`);
+ // The legacy world API remains bounded independently of the town factory schema.
+ const homeLimit=Number.isFinite(data.homeLimit)&&data.homeLimit>0?Math.min(data.homeLimit,10000):10000;
+ const result=parseField(id==='town:town.houses'?{...f,max:districtTotal?500000:homeLimit}:f,raw);if(!result.ok)throw Error(result.error);
  if(f.type==='enum'&&!f.options.includes(result.value))throw Error('Choose one of the listed options.');
- put(draft[BUCKET[f.scope]]??={},f.path,districtTotal?Math.min(result.value,data.homeLimit||10000):result.value);
+ put(draft[BUCKET[f.scope]]??={},f.path,districtTotal?Math.min(result.value,homeLimit):result.value);
  if(pin)draft.guidedSetup.pins[id]=true;
  if(pin&&STAFFING.some(s=>id==='run:'+s.path))markStaffingEdited(draft,f.path);
  if(id==='town:town.houses'){
