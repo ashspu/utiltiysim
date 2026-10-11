@@ -27,8 +27,10 @@ class NoRedirects(HTTPRedirectHandler):
         return None
 
 
-def request(port, path, token, body=None):
+def request(port, path, token, body=None, pins=None):
     headers = {"Authorization": "Bearer " + token, "Accept": "application/json"}
+    if pins is not None:
+        headers.update({"X-UtilitySim-Run-Id": pins[0], "X-UtilitySim-Controller-Id": pins[1]})
     if body is not None:
         headers["Content-Type"] = "application/json"
     req = Request(f"http://127.0.0.1:{port}{path}", headers=headers,
@@ -91,7 +93,8 @@ def pause(cfg, timeout=90):
         before = status()
         command_id = "backup-pause-" + str(uuid.uuid4())
         receipt = request(item["port"], "/connected/commands", service_token,
-                          {"commandId": command_id, "expectedRevision": before["revision"], "action": "pause"})
+                          {"commandId": command_id, "expectedRevision": before["revision"], "action": "pause"},
+                          pins=(cfg["runId"], item["controllerId"]))
         identity(cfg, receipt)
         require(receipt.get("commandId") == command_id and receipt.get("status") == "accepted"
                 and receipt["revision"] == before["revision"] + 1, "Pause receipt is not the submitted command.")

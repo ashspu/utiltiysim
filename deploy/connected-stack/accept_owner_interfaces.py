@@ -122,7 +122,7 @@ def drill(utilsim, virtual_systems):
                     else:
                         raise RuntimeError("Live controller was incorrectly accepted for backup.")
                     receipt = owners.request(server.server_port, "/connected/commands", service_token,
-                        {"commandId": "isolated-resume", "expectedRevision": 0, "action": "resume"})
+                        {"commandId": "isolated-resume", "expectedRevision": 0, "action": "resume"}, pins=(run_id, controller_id))
                     stack.require(receipt["revision"] == 1, "Resume receipt mismatch.")
                     for _ in range(100):
                         state = owners.request(server.server_port, "/connected", service_token)

@@ -218,8 +218,9 @@ class OwnerInterfaceTests(unittest.TestCase):
         state = {"runId": cfg["runId"], "controllerId": "controller-one", "revision": 0}
         current = {**state, "revision": 1, "clock": "2026-07-15T00:00:00Z", "phase": "paused", "activeCommandId": None}
         receipt = {**state, "revision": 1, "commandId": None, "status": "accepted"}
-        def reply(_port, path, _token, body=None):
+        def reply(_port, path, _token, body=None, pins=None):
             if body is not None:
+                self.assertEqual(pins, (cfg["runId"], "controller-one"))
                 receipt["commandId"] = body["commandId"]
                 current["lastCommand"] = {"commandId": body["commandId"], "status": "completed", "acceptedRevision": 1}
                 return receipt
