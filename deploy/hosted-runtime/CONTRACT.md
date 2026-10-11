@@ -32,7 +32,49 @@ Definitive rejection additionally requires the pinned `runId`, `controllerId`, e
 
 `GET /hosted/health` is gateway-authenticated, requires no user-world grant and actually checks the persistent catalog; `python -m utilsim.hosted.health` is the container readiness command. Machine readiness uses the actual pinned `/machine/.../status`. `python -m utilsim.hosted.backup backup|restore --source ... --destination ...` creates a private checked producer checkpoint. It serializes physical clocks, snapshots SQLite with explicit handle closure and records file checksums. Restore refuses changed paths, corrupt files and nonempty destinations; it supports an empty replacement volume at the original path. This is a producer checkpoint only: coordinated backup must pause/stop VS and preserve its separate runtime, business, delivery, control and field owners as well. Neither private backups nor secret files belong in a public repo.
 
-Remote managed field reservations/lease propagation are still a separate integration gate; this port currently executes supported physical field commands under the fixed controller. It does not claim a remote ManagedField workforce lease or invent a depot in Lantern. Machine cohorts describe initial/current configured recipients; occupancy transitions require explicit commercial/cohort reconciliation. Independent physical scenarios and enterprise exceptions remain visible rather than automatically resolved.
+### Fixed live managed-field callbacks
+
+The opt-in managed-field bridge uses the existing ManagedField broker and two
+fixed authenticated controller POST routes. `/connected/field-authority` accepts
+only existing jobId/reservationId identifiers and returns `connected-field-authority/1`
+with actual run/controller/world/field-owner/runtime-path/executor identity,
+clock, runStatus, leaseActive, leaseHeld, crewResources and selected live job,
+dependencies and reservation. Raw lease credentials are never returned. The
+producer checks all pins and schema before using this flat response as the
+trusted callback. `/connected/field-calendar` accepts exact
+`{day,time,timeZone,fold}` and returns `connected-field-calendar/1` with pinned
+run/controller and the existing DST-aware converter's canonical UTC instant.
+The origin and service credential remain server configured; no worker supplies
+authority, calendar conversion, an actor, clock, callback URL or runtime path.
+
+Under the existing fixed-world machine capability:
+
+| Route | Input / result |
+| --- | --- |
+| GET `/field-managed/status` | actual `{schemaVersion:connected-field-status/1,fieldOwnerId,environmentId,fingerprint,enabled}`; no controller callback on startup |
+| GET `/field-managed/assignment?assignmentId=...` | actual saved `{assignment,checksum}`, verified against the original accepted payload; no controller callback |
+| POST `/field-managed/plan` | exact `{quote,schedule}` using existing field-travel and managed-schedule contracts; returns original immutable plan |
+| POST `/field-managed/bind` | exact `{assignmentId,jobId,reservationId}`; binds the actual matching pending job and reservation |
+| POST `/field-managed/execute` | exact `{jobId,reservationId}`; producer constructs the envelope from live job/run/clock, then ManagedField rechecks authority before effects |
+| POST `/field-managed/cancel` | exact `{assignmentId}`; existing actual cancellation rules apply; committed physical work cannot be undone |
+
+Planning/binding require actual paused status and no recorded lease, including
+an expired lease. Executing a delivering job requires a live unexpired lease;
+already committed results retain exact replay semantics. Existing persisted
+plan runtime/executor pins reject silent authority rebinding. Field status,
+assignment reads, feeds and commands open the registered sidecar in SQLite
+mode=rw and reject missing/empty owners rather than recreate them. Initial
+connection setup alone creates and pins the separate field owner. Field feeds
+and exact Billing/domain receipts remain unchanged, including acknowledgement
+before report delivery.
+
+This closes the producer code interface; actual remote Run/Billing/lease
+acceptance requires the corresponding private callbacks, dispatcher and tests.
+The bridge does not invent a depot in Lantern or claim the shared436 source can
+quote a route without its existing required geometry. Machine cohorts describe
+initial/current configured recipients; occupancy transitions require explicit
+commercial/cohort reconciliation. Physical scenarios and enterprise exceptions
+remain visible rather than automatically resolved.
 
 Status: local implementation only. No online compute provisioned or deployed. Per Greg's 2026-10-11 clarification, online initial setup and durable setup drafts are distinct from a playable simulation; future compute hosting is separate work. These endpoints create real physical worlds and must not serve as draft-storage endpoints.
 
