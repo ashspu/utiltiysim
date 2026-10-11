@@ -1,0 +1,33 @@
+name: hosted-runtime-container
+# Incremental estimate:8–10 runner minutes/run,32–40/month at4 runs.
+# No scheduled or push-triggered builds, no registry push, no production secrets.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'utilsim/hosted/**'
+      - 'deploy/hosted-runtime/**'
+      - 'scripts/check_hosted_container.py'
+      - '.dockerignore'
+      - '.github/workflows/hosted-runtime-container.yml'
+  workflow_dispatch:
+concurrency:
+  group: hosted-runtime-container-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  container:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build locked producer image
+        run: docker build --build-arg SOURCE_REVISION="$GITHUB_SHA" -t utilitysim-runtime:test -f deploy/hosted-runtime/Dockerfile .
+      - name: Verify non-root volume, HTTP auth, replay, restart and restore
+        run: python3 scripts/check_hosted_container.py --image utilitysim-runtime:test --output container-evidence.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hosted-runtime-container-evidence
+          path: container-evidence.json
