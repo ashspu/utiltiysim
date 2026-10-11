@@ -17,7 +17,9 @@ from .library import HostedLibrary
 from .setup import presentation
 
 ROLES = {'view': {'owner', 'operator', 'billing', 'support', 'analyst'},
-         'create': {'owner'}, 'advance': {'owner', 'operator'}}
+         'create': {'owner'}, 'advance': {'owner', 'operator'},
+         'billing.view': {'owner', 'operator', 'billing', 'support', 'analyst'},
+         'billing.run': {'owner', 'billing'}}
 
 
 def permits(grants, action, town):
@@ -31,19 +33,25 @@ def permits(grants, action, town):
                     continue
             except (ValueError, TypeError, AttributeError):
                 continue
-        if grant.get('town') in ('*', town) and grant.get('role') in ROLES[action]:
+        if (grant.get('town') in ('*', town) and isinstance(grant.get('role'), str)
+                and grant['role'] in ROLES[action]):
             return True
     return False
 
 
 def create_app(root, token, machine_key=None, controller_id='utilitysim-controller', controller_url=None,
-               controller_token=None, controller_allow_http=False):
+               controller_token=None, controller_allow_http=False, operator_token=None):
     if not isinstance(token, str) or len(token) < 32:
         raise ValueError('Configure an internal bearer token of at least 32 characters.')
     if machine_key is not None and machine_key == token:
         raise ValueError('Machine key must be distinct from the browser gateway credential.')
     if controller_token is not None and controller_token in (token, machine_key):
         raise ValueError('Controller service token must be distinct from gateway and machine credentials.')
+    if operator_token is not None and (
+            not isinstance(operator_token, str) or not 32 <= len(operator_token) <= 4096
+            or any(ord(char) < 33 or ord(char) > 126 for char in operator_token)
+            or operator_token in (token, machine_key, controller_token)):
+        raise ValueError('Configure a distinct bounded printable operator service token.')
     library = HostedLibrary(root)
     from .machine import MachinePort
     from .machine_routes import install
@@ -279,6 +287,10 @@ def create_app(root, token, machine_key=None, controller_id='utilitysim-controll
         return library.sentiment_command(owned(identity, request, 'advance'), value)
 
     install(app, machine, owned, body, controller_url, controller_token, controller_allow_http)
+    from .operator import install as install_operator
+    from .premises import install as install_premises
+    install_operator(app, machine, owned, body, permits, controller_url, operator_token, controller_allow_http)
+    install_premises(app, library, owned)
     return app
 
 
@@ -298,4 +310,5 @@ def from_environment():
     return create_app(root, secret('UTILITYSIM_RUNTIME_TOKEN'), secret('UTILITYSIM_MACHINE_KEY'),
                       os.environ.get('UTILITYSIM_CONTROLLER_ID', 'utilitysim-controller'),
                       os.environ.get('UTILITYSIM_CONTROLLER_URL'), secret('UTILITYSIM_CONTROLLER_TOKEN'),
-                      os.environ.get('UTILITYSIM_CONTROLLER_ALLOW_HTTP') == '1')
+                      os.environ.get('UTILITYSIM_CONTROLLER_ALLOW_HTTP') == '1',
+                      secret('UTILITYSIM_OPERATOR_TOKEN'))

@@ -46,7 +46,7 @@ class ControllerProxy:
             raise ValueError('Configure a fixed TLS controller origin and a separate service token.')
         self.url = parsed
 
-    def call(self, connection, path, value=None, deadline=None):
+    def call(self, connection, path, value=None, deadline=None, *, project=None, max_response=3_000_000):
         if self.url is None:
             raise HTTPException(503, 'Authoritative connected controller is not configured.')
         deadline = deadline if deadline is not None else time.monotonic() + 15
@@ -72,13 +72,15 @@ class ControllerProxy:
                 if time.monotonic() >= deadline:
                     raise TimeoutError()
                 socket.settimeout(max(.01, deadline - time.monotonic()))
-                chunk = response.read1(min(65536, 3_000_001 - len(raw)))
+                chunk = response.read1(min(65536, max_response + 1 - len(raw)))
                 if not chunk:
                     break
                 raw.extend(chunk)
-                if len(raw) > 3_000_000:
+                if len(raw) > max_response:
                     raise ValueError('Controller response exceeded its bound.')
             result = json.loads(raw)
+            if project is not None:
+                return project(response.status, result)
             if response.status not in (200, 202):
                 if (response.status in (400, 409, 422) and path == '/connected/commands' and value is not None
                         and isinstance(result, dict) and result.get('commandRejected') is True
