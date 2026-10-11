@@ -99,8 +99,29 @@ def validate_config(cfg):
         argv(service.get("command"), role + "startup")
         argv(service.get("healthCommand"), role + "readiness")
     controller = services["controller"]
-    argv(controller.get("pauseCommand"), "controller pause")
-    argv(controller.get("checkpointCommand"), "controller checkpoint")
+    mode = cfg.get("recoveryMode", "owner-hooks/1")
+    require(mode in ("owner-hooks/1", "owner-cli-stopped/1"), "Unsupported recovery integration mode.")
+    if mode == "owner-hooks/1":
+        argv(controller.get("pauseCommand"), "controller pause")
+        argv(controller.get("checkpointCommand"), "controller checkpoint")
+    else:
+        require(cfg["fieldEnabled"] is False, "Actual VS remote field recovery is unsupported.")
+        item = cfg.get("ownerCli")
+        require(isinstance(item, dict) and set(item) == {"directory", "remoteConfig", "controllerId", "worldId", "port", "serviceTokenEnv", "clockTokenEnv"},
+                "Supply the exact stopped owner CLI configuration.")
+        for name in ("directory", "remoteConfig"):
+            path = item.get(name)
+            require(isinstance(path, str) and (path == "/data" or path.startswith("/data/"))
+                    and ".." not in PurePosixPath(path).parts and "\\" not in path,
+                    "Owner CLI paths must stay at the original /data mount.")
+        require(type(item.get("port")) is int and 1 <= item["port"] <= 65535,
+                "Supply the actual loopback controller port.")
+        require(all(isinstance(item.get(name), str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", item[name])
+                    for name in ("controllerId", "worldId")), "Pin actual controller and producer world identities.")
+        require(all(isinstance(item.get(name), str) for name in ("serviceTokenEnv", "clockTokenEnv")) and
+                item["serviceTokenEnv"] != item["clockTokenEnv"] and
+                all(name in controller["requiredSecrets"] for name in (item["serviceTokenEnv"], item["clockTokenEnv"])),
+                "Declare separate controller service and runtime clock capabilities.")
     evidence = cfg.get("evidence", {})
     for name in ("producerContainerAcceptance", "controllerConnectedAcceptance", "linuxRestoreAcceptance"):
         require(isinstance(evidence.get(name), str) and evidence[name].strip(), f"Record reviewed {name} evidence.")
@@ -242,6 +263,12 @@ def service(role, action):
     if action == "health":
         run(item["healthCommand"], env=env, timeout=12)
         return
+    if action == "owner-pause":
+        require(role == "controller" and cfg.get("recoveryMode") == "owner-cli-stopped/1", "Select the actual stopped owner CLI integration.")
+        raw = run(["python", "/ops/owners.py", "pause"], env=env, timeout=110, capture=True)
+        # This action reports executed pause/lease facts only, never stopped workers.
+        print(raw.decode().strip())
+        return
     require(role == "controller", "Controller hooks cannot run in the producer.")
     raw = run(item[action + "Command"], env=env, timeout=120, capture=True)
     try:
@@ -263,20 +290,20 @@ def service(role, action):
     if action == "checkpoint":
         require(result["complete"] is True and isinstance(result["owners"], list) and
                 all(isinstance(x, str) for x in result["owners"]) and
-                {"runtime", "world", "catalog", "billing", "ledger", "evidence", "controller"} <= set(result["owners"]),
+                set(cfg["ownerFiles"]) <= set(result["owners"]),
                 "Checkpoint must include every connected owner, plus field when configured.")
-        require(set(result["owners"]) <= {"runtime", "world", "catalog", "billing", "ledger", "evidence", "controller", "field"},
+        require(set(result["owners"]) <= {"runtime", "world", "catalog", "billing", "ledger", "evidence", "controller", "field", "producerField"},
                 "Checkpoint must return only the defined owner identifiers.")
     print(json.dumps({key: result[key] for key in sorted(required)}))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["validate", "preflight", "initialize-volume", "up", "stop", "launch", "health", "pause", "checkpoint"])
+    parser.add_argument("action", choices=["validate", "preflight", "initialize-volume", "up", "stop", "launch", "health", "pause", "checkpoint", "owner-pause"])
     parser.add_argument("role", nargs="?", choices=ROLES)
     parser.add_argument("--config", default=str(HERE / "deployment.json"))
     args = parser.parse_args()
-    if args.action in ("launch", "health", "pause", "checkpoint"):
+    if args.action in ("launch", "health", "pause", "checkpoint", "owner-pause"):
         require(args.role, "Select the service role.")
         service(args.role, args.action)
         return

@@ -2,13 +2,18 @@
 import copy
 import io
 import json
+import os
 import sqlite3
+import sys
 import tarfile
 import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from types import ModuleType
+from unittest.mock import patch
 
+import owners
 import recovery
 import stack
 
@@ -16,6 +21,7 @@ import stack
 def fixture():
     cfg = stack.read_json(stack.HERE / "deployment.example.json")
     cfg.update(readiness="deployment-ready", runId="isolated-unit-run", volumeId="bc28a5b8-92c1-4d62-a397-45ca74c528e1",
+               recoveryMode="owner-hooks/1",
                producerHost="producer.goodquartercompany.com", ageRecipient="age1" + "q" * 58)
     for role, item in cfg["services"].items():
         item["image"] = "test/" + role + "@sha256:" + "1" * 64
@@ -90,7 +96,7 @@ class ArchiveTests(unittest.TestCase):
         (self.data / stack.MARKER).write_text(json.dumps({"schemaVersion": stack.SCHEMA, "volumeId": self.cfg["volumeId"], "runId": self.cfg["runId"]}))
         proof = dict(runId=self.cfg["runId"], clock="2026-07-18T00:00:00Z", controllerRevision=7,
                      paused=True, idle=True, workersStopped=True, complete=True,
-                     owners=["runtime", "world", "catalog", "billing", "ledger", "evidence", "controller"])
+                     owners=sorted(self.cfg["ownerFiles"]))
         self.record = recovery.manifest(self.cfg, proof, self.data)
 
     def archive(self, record=None, extra=None):
@@ -168,6 +174,103 @@ class ArchiveTests(unittest.TestCase):
         stage.mkdir()
         with self.assertRaises(stack.Refused):
             recovery.unpack_verified(self.archive(), stage, self.cfg, max_bytes=1)
+
+
+class OwnerInterfaceTests(unittest.TestCase):
+    def config(self):
+        cfg = fixture()
+        cfg["recoveryMode"] = "owner-cli-stopped/1"
+        cfg["ownerCli"].update(controllerId="controller-one", worldId="world-one")
+        cfg["services"]["controller"].update(requiredSecrets=["CONNECTED_SERVICE_TOKEN", "CONNECTED_CLOCK_TOKEN"],
+                                              pauseCommand=[], checkpointCommand=[])
+        return cfg
+
+    def test_actual_owner_mode_requires_fixed_id_scoped_credentials_and_rejects_remote_field(self):
+        stack.validate_config(self.config())
+        for change in (lambda cfg: cfg["ownerCli"].update(worldId=None),
+                       lambda cfg: cfg["ownerCli"].update(serviceTokenEnv="CONNECTED_CLOCK_TOKEN"),
+                       lambda cfg: cfg.update(fieldEnabled=True),
+                       lambda cfg: cfg["ownerCli"].update(directory="/data/../foreign")):
+            cfg = self.config()
+            change(cfg)
+            with self.assertRaises(stack.Refused):
+                stack.validate_config(cfg)
+
+    def test_sqlite_snapshot_preserves_only_committed_wal_data(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            with closing(sqlite3.connect(source / "runtime.sqlite")) as db:
+                db.execute("PRAGMA journal_mode=WAL")
+                db.execute("CREATE TABLE progress(value INTEGER)")
+                db.execute("INSERT INTO progress VALUES(19)")
+                db.commit()
+                db.execute("INSERT INTO progress VALUES(20)")
+                owners.copy_tree(source, root / "copy")
+                with closing(sqlite3.connect(root / "copy/runtime.sqlite")) as copied:
+                    self.assertEqual(copied.execute("SELECT value FROM progress").fetchall(), [(19,)])
+                self.assertFalse((root / "copy/runtime.sqlite-wal").exists())
+
+    def test_pause_acceptance_or_completed_pause_with_live_lease_cannot_claim_stopped_checkpoint(self):
+        cfg = self.config()
+        module = ModuleType("connected.__main__")
+        state = {"runId": cfg["runId"], "controllerId": "controller-one", "revision": 0}
+        current = {**state, "revision": 1, "clock": "2026-07-15T00:00:00Z", "phase": "paused", "activeCommandId": None}
+        receipt = {**state, "revision": 1, "commandId": None, "status": "accepted"}
+        def reply(_port, path, _token, body=None):
+            if body is not None:
+                receipt["commandId"] = body["commandId"]
+                current["lastCommand"] = {"commandId": body["commandId"], "status": "completed", "acceptedRevision": 1}
+                return receipt
+            return {"runId": cfg["runId"], "clock": current["clock"], "status": "paused", "processing": True}
+        module._status = lambda *_args: state if receipt["commandId"] is None else current
+        with patch.dict(sys.modules, {"connected.__main__": module}), patch.dict(os.environ, {
+                "CONNECTED_SERVICE_TOKEN": "separate-service", "CONNECTED_CLOCK_TOKEN": "runtime-actor"}), \
+                patch.object(owners, "request", side_effect=reply), patch.object(owners.time, "monotonic", side_effect=[0, 0, 2]):
+            with self.assertRaises(stack.Refused):
+                owners.pause(cfg, timeout=1)
+
+    def test_clock_or_revision_change_after_pause_refuses_before_snapshot(self):
+        cfg = self.config()
+        pause = {"runId": cfg["runId"], "clock": "2026-07-15T00:00:00Z", "controllerRevision": 2}
+        for name, value in (("clock", "2026-07-16T00:00:00Z"), ("controllerRevision", 3)):
+            proof = {**pause, name: value}
+            with patch.object(recovery, "compose", return_value=json.dumps(pause).encode()), \
+                    patch.object(recovery, "stopped"), patch.object(recovery, "owner_container", return_value=proof) as snapshot:
+                with self.assertRaises(stack.Refused):
+                    recovery.owner_snapshots(cfg, "unused-config", "unused-staging")
+                self.assertEqual(snapshot.call_count, 1)
+
+    def test_stopped_producer_pending_original_job_is_retained_and_foreign_identity_refused(self):
+        cfg = self.config()
+        proof = {"worldFingerprint": "fixed-fingerprint", "clock": "2026-07-15T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with closing(sqlite3.connect(root / "catalog.sqlite")) as db, db:
+                db.execute("CREATE TABLE hosted_connections(world,environment,fingerprint,controller,active)")
+                db.execute("INSERT INTO hosted_connections VALUES(?,?,?,?,1)",
+                           ("world-one", cfg["runId"], proof["worldFingerprint"], "controller-one"))
+                db.execute("CREATE TABLE worlds(id,path,fingerprint)")
+                db.execute("INSERT INTO worlds VALUES(?,?,?)", ("world-one", os.path.normcase(str(Path('/data/world.sqlite'))), proof["worldFingerprint"]))
+            with closing(sqlite3.connect(root / "world.sqlite")) as db, db:
+                db.execute("CREATE TABLE meta(key,value)")
+                db.executemany("INSERT INTO meta VALUES(?,?)", [(name, json.dumps(value)) for name, value in {
+                    "environment": cfg["runId"], "fingerprint": proof["worldFingerprint"], "through": "2026-07-15"}.items()])
+                db.execute("CREATE TABLE machine_days(id,result)")
+                db.execute("INSERT INTO machine_days VALUES('original-lost-reply-job',NULL)")
+            result = owners.producer_binding(cfg, root, proof)
+            self.assertEqual(result["pendingMachineCommands"], 1)
+            copy_temporary = tempfile.TemporaryDirectory()
+            self.addCleanup(copy_temporary.cleanup)
+            copied = Path(copy_temporary.name) / "owners"
+            owners.copy_tree(root, copied)
+            with closing(sqlite3.connect(copied / "world.sqlite")) as db:
+                self.assertEqual(db.execute("SELECT * FROM machine_days").fetchall(), [("original-lost-reply-job", None)])
+            with self.assertRaises(stack.Refused):
+                owners.producer_binding(cfg, root, {**proof, "worldFingerprint": "foreign-world"})
+            with self.assertRaises(stack.Refused):
+                owners.producer_binding(cfg, root, {**proof, "clock": "2026-07-14T00:00:00Z"})
 
 
 if __name__ == "__main__":

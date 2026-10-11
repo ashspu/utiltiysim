@@ -14,6 +14,7 @@ from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
+import owners
 from stack import (
     HERE,
     MARKER,
@@ -88,36 +89,81 @@ def manifest(cfg, proof, root):
             "files": files(root)}
 
 
+def owner_container(cfg, config_path, role, staging, action):
+    """Run actual owner tooling offline after every stack writer is stopped."""
+    command = ["docker", "run", "--rm", "--network", "none", "--read-only", "--user", "10001:10001",
+               "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
+               "--tmpfs", "/tmp:rw,nosuid,nodev,size=128m,uid=10001,gid=10001",
+               "--mount", f"type=bind,source={Path(cfg['dataRoot']) / role},target=/data",
+               "--mount", f"type=bind,source={Path(config_path).resolve()},target=/config/deployment.json,readonly",
+               "--mount", f"type=bind,source={HERE},target=/ops,readonly",
+               "--mount", f"type=bind,source={staging},target=/snapshot",
+               "--entrypoint", "python", cfg["services"][role]["image"], "/ops/owners.py", action]
+    return json.loads(run(command, timeout=180, capture=True))
+
+
+def owner_snapshots(cfg, config_path, staging):
+    # Public ingress closes before pause. If any step fails, it stays closed.
+    compose(cfg, config_path, "stop", "--timeout", "120", "edge")
+    pause = json.loads(compose(cfg, config_path, "exec", "--no-TTY", "controller", "python", "/ops/stack.py",
+                              "owner-pause", "controller", capture=True))
+    require(pause.get("runId") == cfg["runId"] and type(pause.get("controllerRevision")) is int
+            and isinstance(pause.get("clock"), str), "Owner pause returned no fixed-run boundary.")
+    compose(cfg, config_path, "stop", "--timeout", "120")
+    stopped(cfg, config_path)
+    proof = owner_container(cfg, config_path, "controller", staging, "controller-snapshot")
+    require(proof.get("runId") == cfg["runId"] and proof.get("clock") == pause["clock"]
+            and proof.get("controllerRevision") == pause["controllerRevision"],
+            "Stopped VS clock/revision moved after the executed pause.")
+    producer = owner_container(cfg, config_path, "producer", staging, "producer-snapshot")
+    require(producer.get("producerBackup") is True, "Actual producer backup did not complete.")
+    snapshot = Path(staging) / "data"
+    (Path(staging) / "producer-snapshot/data").rename(snapshot / "producer")
+    shutil.copyfile(Path(cfg["dataRoot"]) / MARKER, snapshot / MARKER)
+    proof.update(owners.producer_binding(cfg, snapshot / "producer", proof))
+    require(all((snapshot / item["service"] / item["path"]).is_file()
+                for item in cfg["ownerFiles"].values()), "Combined snapshot omits a bound owner.")
+    proof.update(paused=True, idle=True, workersStopped=True, complete=True,
+                 owners=sorted(cfg["ownerFiles"]))
+    return proof, snapshot
+
+
 def backup(cfg, config_path):
     preflight(cfg, config_path)
     require(shutil.which("age"), "Install reviewed age tooling before encrypted backup.")
     destination = Path(cfg["backupDirectory"])
     require(destination.is_dir() and destination.resolve() == destination.absolute(), "Create a protected off-volume backup directory without symbolic links first.")
     require(destination.stat().st_mode & 0o077 == 0, "Backup directory requires mode0700.")
-    proof = checkpoint(cfg, config_path)
-    compose(cfg, config_path, "stop", "--timeout", "120")
-    stopped(cfg, config_path)
     root = Path(cfg["dataRoot"])
-    verify_sqlite(root)
-    record = manifest(cfg, proof, root)
     name = "connected-" + datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ") + ".tar.age"
     final = destination / name
     # Same protected directory; plaintext is temporary and never published.
     with tempfile.TemporaryDirectory(prefix=".backup-", dir=destination) as temporary:
         temp = Path(temporary)
         os.chmod(temp, 0o700)
+        if cfg.get("recoveryMode") == "owner-cli-stopped/1":
+            os.chown(temp, 10001, 10001)
+            proof, snapshot = owner_snapshots(cfg, config_path, temp)
+        else:
+            proof = checkpoint(cfg, config_path)
+            compose(cfg, config_path, "stop", "--timeout", "120")
+            stopped(cfg, config_path)
+            snapshot = root
+        verify_sqlite(snapshot)
+        record = manifest(cfg, proof, snapshot)
+        source_files = files(root)
         (temp / "manifest.json").write_text(json.dumps(record, sort_keys=True) + "\n")
         archive = temp / "owners.tar"
         with tarfile.open(archive, "w") as tar:
             tar.add(temp / "manifest.json", arcname="manifest.json")
-            tar.add(root, arcname="data")
+            tar.add(snapshot, arcname="data")
         os.chmod(archive, 0o600)
         partial = temp / "encrypted.age"
         run(["age", "--recipient", cfg["ageRecipient"], "--output", str(partial), str(archive)], timeout=3600)
         require(partial.is_file() and partial.stat().st_size > 0, "Encrypted backup was not produced.")
         os.chmod(partial, 0o600)
         # Verify source state did not change after the shutdown barrier.
-        require(files(root) == record["files"], "An external writer changed owner files while backing up.")
+        require(files(root) == source_files, "An external writer changed owner files while backing up.")
         partial.rename(final)
     print(json.dumps({"backup": str(final), "sha256": digest(final), "runId": cfg["runId"], "clock": proof["clock"], "servicesStopped": True}))
 
@@ -154,7 +200,7 @@ def unpack_verified(archive, stage, cfg, max_bytes=20 * 1024**3):
     require(record.get("ownerFiles") == cfg["ownerFiles"], "Original producer/VS owner bindings differ.")
     proof = record.get("checkpoint", {})
     require(proof.get("runId") == cfg["runId"] and all(proof.get(x) is True for x in ("paused", "idle", "workersStopped", "complete"))
-            and {"runtime", "world", "catalog", "billing", "ledger", "evidence", "controller"} <= set(proof.get("owners", [])),
+            and set(cfg["ownerFiles"]) <= set(proof.get("owners", [])),
             "Backup lacks a complete paused idle checkpoint.")
     require(not cfg.get("fieldEnabled") or "field" in proof["owners"], "Backup omits managed field state.")
     require(files(stage / "data") == record.get("files"), "Backup file hashes/coverage differ from the manifest.")
