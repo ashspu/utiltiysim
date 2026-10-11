@@ -19,7 +19,7 @@ test('only introduction assets and independently protected API handlers bypass t
   for(const path of ['/workspace.html','/compute-connection.html','/world-control.html','/library.html?town=town-a','/viewer/','/presets/shared/tiled-map.html?preset=town-a']) {
     const result=await run(request(path));assert.equal(result.status,303,path);assert.match(result.headers.get('location'),/^\/api\/auth\/login\?/);assert.equal(result.headers.get('x-middleware-next'),null);
   }
-  for(const path of ['/presets/catalog.json','/presets/town-a/premise-index.json','/presets/town-a/tiles/1-1.json','/library.js']) assert.equal((await run(request(path))).status,401,path);
+  for(const path of ['/presets/catalog.json','/presets/town-a/premise-index.json','/presets/town-a/tiles/1-1.json','/library.js','/world-control-connected.mjs','/world-control-connected-state.mjs','/world-control-connected-view.mjs']) assert.equal((await run(request(path))).status,401,path);
 });
 test('forged or revoked sessions cannot unlock static maps or workspace data',async()=>{
   for(const run of [gate(),gate({failure:true})]) for(const path of ['/workspace.html','/presets/catalog.json','/presets/town-a/tiles/1-1.json']) {
