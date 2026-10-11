@@ -16,7 +16,7 @@ test('only introduction assets and independently protected API handlers bypass t
   for(const path of ['/','/index.html','/landing.js','/welcome.css','/assets/civic-welcome-landscape.png','/brand/utility-studio-icon-color.svg','/api/auth/login','/atlas/api/state','/api/runtime']) {
     const result=await run(request(path));assert.equal(result.headers.get('x-middleware-next'),'1',path);
   }
-  for(const path of ['/workspace.html','/compute-connection.html','/world-control.html','/library.html?town=town-a','/viewer/','/presets/shared/tiled-map.html?preset=town-a']) {
+  for(const path of ['/workspace.html','/compute-connection.html','/world-control.html','/vs-operator.html','/library.html?town=town-a','/viewer/','/presets/shared/tiled-map.html?preset=town-a']) {
     const result=await run(request(path));assert.equal(result.status,303,path);assert.match(result.headers.get('location'),/^\/api\/auth\/login\?/);assert.equal(result.headers.get('x-middleware-next'),null);
   }
   for(const path of ['/presets/catalog.json','/presets/town-a/premise-index.json','/presets/town-a/tiles/1-1.json','/library.js','/world-control-connected.mjs','/world-control-connected-state.mjs','/world-control-connected-view.mjs']) assert.equal((await run(request(path))).status,401,path);
@@ -49,6 +49,9 @@ test('compute settings are owner-only while world controls require workspace gra
   assert.equal((await run(request('/world-control.html','valid'))).headers.get('x-middleware-next'),'1');
   assert.equal((await gate({granted:false})(request('/world-control.html','valid'))).status,403);
   assert.equal((await run(request('/api/compute?action=connection',undefined,'POST'))).headers.get('x-middleware-next'),'1');
+  assert.equal((await run(request('/api/operator?id='+ 'a'.repeat(32),undefined,'POST'))).headers.get('x-middleware-next'),'1');
+  assert.equal((await run(request('/vs-operator-core.mjs'))).status,401);
+  assert.equal((await run(request('/vs-operator.html','valid'))).headers.get('x-middleware-next'),'1');
 });
 test('missing auth configuration fails closed for protected files',async()=>{
   const run=createPageAccess({env:{}});

@@ -40,6 +40,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Shell authorization and operator tests
+        run: npm ci && npm run test:auth
       - name: Viewer tests
         run: npm ci && npm test
         working-directory: packages/town-viewer
