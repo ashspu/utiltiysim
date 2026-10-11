@@ -1,5 +1,6 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
 import { renderPhysicalSliderForm, configurationFormSchema, upgradePhysicalConfiguration, physicalFields, getPath } from './physical-slider-form.mjs';
+import { initializationProgress, retainCreationResult } from './workspace-start-state.mjs';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
 const isOwner = () => session.grants.some(g => g.role === 'owner');
@@ -91,7 +92,7 @@ async function openLibrary() {
   try{const {setups}=await api('/api/setups');if(!list.isConnected)return;list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><span class="eyebrow">SAVED STARTING CONDITIONS</span><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>Saved ${esc(new Date(s.updatedAt).toLocaleString())}</small><div class="saved-setup-actions"><button data-open-setup="${esc(s.id)}">Review setup →</button>${canStart(s)?`<button class="primary" data-start-setup="${esc(s.id)}">Start simulation</button>`:''}</div><p class="start-feedback" role="status"></p></article>`).join(''):'<p>No online setups saved yet. Create a world to choose its starting conditions.</p>';list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||!source.canConfigure||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an unavailable map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});
     list.querySelectorAll('[data-start-setup]').forEach(button=>{
       const setup=setups.find(s=>s.id===button.dataset.startSetup),feedback=button.closest('article').querySelector('.start-feedback');
-      try { const pending=readStart(setup); if(pending?.worldId){showStarted(button,feedback,pending.worldId);return;} if(pending){button.textContent=pending.pendingWorldId?'Continue setup':'Retry original start';feedback.textContent=pending.pendingWorldId?`This physical world is still initializing.${Number.isInteger(pending.appliedCommands)?` ${pending.appliedCommands} setup commands committed.`:''} Continue runs the next bounded setup batch with the original saved conditions.`:'A previous start has not been confirmed. Retry uses its original saved conditions.';} }
+      try { const pending=readStart(setup); if(pending?.worldId){showStarted(button,feedback,pending.worldId);return;} if(pending){button.textContent=pending.pendingWorldId?'Continue setup':'Retry original start';feedback.textContent=pending.pendingWorldId?`This physical world is still initializing. ${initializationProgress(pending)} Continue runs the next bounded setup batch with the original saved conditions.`:'A previous start has not been confirmed. Retry uses its original saved conditions.';} }
       catch(error){button.disabled=true;feedback.textContent=error.message;return;}
       button.onclick=()=>startSetup(setup,button,feedback,runtime);
     });
@@ -114,17 +115,13 @@ async function startSetup(setup,button,feedback,runtime) {
     // Persist before sending. A lost response or reload must replay exactly this command and payload.
     sessionStorage.setItem(startKey(setup),JSON.stringify(record));
     const world=await api('/api/compute?action=create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record.payload)});
-    if(!worldLink(world.id))throw new Error('The runtime returned an invalid simulation identifier.');
+    record=retainCreationResult(record,world);sessionStorage.setItem(startKey(setup),JSON.stringify(record));
     if(world.available!==true){
-      record.pendingWorldId=world.id;
-      if(Number.isInteger(world.initialization?.appliedCommands))record.appliedCommands=world.initialization.appliedCommands;
-      sessionStorage.setItem(startKey(setup),JSON.stringify(record));
       button.disabled=false;button.textContent='Continue setup';
-      feedback.textContent=`Physical world initialization is not complete (${world.state||'pending'}).${Number.isInteger(record.appliedCommands)?` ${record.appliedCommands} setup commands committed.`:''} Continue runs the next bounded setup batch. No simulated days can be advanced until initialization finishes.`;
+      feedback.textContent=`Physical world initialization is not complete (${world.state||'pending'}). ${initializationProgress(record)} Continue runs the next bounded setup batch. No simulated days can be advanced until initialization finishes.`;
       if(runtime.isConnected)void loadWorlds(runtime);
       return;
     }
-    delete record.pendingWorldId;delete record.appliedCommands;record.worldId=world.id;sessionStorage.setItem(startKey(setup),JSON.stringify(record));
     showStarted(button,feedback,world.id);
     if(runtime.isConnected)void loadWorlds(runtime);
   }catch(error){feedback.textContent=`${error.message} The original start request is retained; retry it to recover the same simulation.`;button.disabled=false;button.textContent='Retry original start';}
