@@ -1,0 +1,103 @@
+{
+  "name": "Two River Forest",
+  "revision": 1,
+  "targetHomes": 500,
+  "allowedHomes": [
+    450,
+    550
+  ],
+  "actualHomes": 451,
+  "pools": 100,
+  "solar": 0,
+  "school": 1,
+  "church": 1,
+  "commercial": 16,
+  "industrial": 6,
+  "utilityPremises": 1,
+  "mappedPremises": 476,
+  "blocks": 27,
+  "roadSegments": 103,
+  "roadNames": 38,
+  "displayedPoles": 164,
+  "minimumPoleSeparationM": 35.071,
+  "nominalPoleTargetSpacingM": 42,
+  "displayedHydrants": 54,
+  "meters": 1384,
+  "illustrationCountCertified": false,
+  "geometryInterpretation": "Human-authored interpretation of generated zoning; not automatic vectorization.",
+  "artMethod": "Built-in image_gen; raw outputs retained; SVG geometry and street furniture are code-native.",
+  "images": {
+    "01-generative-zoning.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "02-measured-zoning.png": {
+      "width": 3072,
+      "height": 2048
+    },
+    "03-parcels-buildings.png": {
+      "width": 3072,
+      "height": 2048
+    },
+    "04-system-bindings.png": {
+      "width": 3072,
+      "height": 2048
+    },
+    "05-controlled-map.png": {
+      "width": 3072,
+      "height": 2048
+    },
+    "05a-before-curb-fix.png": {
+      "width": 3072,
+      "height": 2048
+    },
+    "06-ai-illustration-v2.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "06-ai-illustration.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "07-pilot-illustration-v2.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "07-pilot-illustration.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "08-live-controlled-overview.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "09-live-curb-and-equipment.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "10-live-hybrid-overview.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "11-live-hybrid-pilot.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "12-road-pool-alignment.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "13-live-property-record.png": {
+      "width": 1536,
+      "height": 1024
+    },
+    "14-mobile-map.png": {
+      "width": 390,
+      "height": 844
+    },
+    "pilot-source.png": {
+      "width": 3072,
+      "height": 2048
+    }
+  }
+}

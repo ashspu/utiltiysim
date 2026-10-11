@@ -1,0 +1,46 @@
+// Run only against a disposable QA runtime: this exercises real day/read/bill mutations.
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {chromium,browserOptions} from './browser-runtime.mjs';
+const base=process.env.ATLAS_URL||'http://127.0.0.1:8054',preset=process.argv[2]||'ashtown-5000';
+const out=process.env.ATLAS_QA_OUTPUT||'out/release-qa/shell';await mkdir(out,{recursive:true});
+const browser=await chromium.launch(browserOptions),errors=[];
+try{
+ const page=await browser.newPage({viewport:{width:1600,height:1000}});page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(`${base}/?town=${preset}`);
+ await page.waitForFunction(()=>document.querySelector('#connection-status').textContent==='Persistent runtime connected',null,{timeout:180000});
+ const map=page.frames().find(f=>f.url().includes('tiled-map.html'));
+ await map.waitForFunction(()=>window.mapReady,null,{timeout:180000});
+ const index=await(await page.request.get(`${base}/presets/${preset}/premise-index.json`)).json();
+ const id=Object.keys(index)[0],[x,y]=index[id];
+ await map.evaluate(([x,y])=>window.mapView.frame([x-70,y-35,140,90]),[x,y]);
+ await map.waitForFunction(()=>window.renderStats.visibleFeatures>0);
+ await page.waitForTimeout(120);
+ const point=await map.locator('#map').evaluate((c,[x,y])=>{const v=window.mapView.get(),r=c.getBoundingClientRect();return{x:r.left+(x-v[0])/v[2]*r.width,y:r.top+(y-v[1])/v[3]*r.height};},[x,y]);
+ const iframeBox=await page.locator('#town-map').boundingBox();
+ await page.mouse.click(iframeBox.x+point.x,iframeBox.y+point.y);
+ await page.waitForFunction(id=>document.querySelector('#property-body').textContent.includes(id)&&document.querySelector('#property-body').textContent.includes('Physical meter records'),id);
+ await page.screenshot({path:`${out}/${preset}-linked-account.png`});
+ await page.locator('#close-property').click();
+ await page.locator('[data-page="billing"]').first().click();
+ const stateBefore=await(await page.request.get(`${base}/atlas/api/state?town=${preset}`)).json();
+ await page.locator('[data-action="advance"]').click();
+ await page.waitForFunction(()=>!document.querySelector('[data-action="advance"]').disabled,null,{timeout:180000});
+ const stateAfter=await(await page.request.get(`${base}/atlas/api/state?town=${preset}`)).json();
+ assert.notEqual(stateBefore.through,stateAfter.through);
+ await page.locator('[data-action="ingest"]').click();
+ await page.waitForFunction(()=>!document.querySelector('[data-action="ingest"]').disabled,null,{timeout:180000});
+ await page.locator('#bill-start').fill(stateBefore.through);await page.locator('#bill-end').fill(stateAfter.through);
+ await page.locator('[data-action="bill"]').click();
+ await page.waitForFunction(()=>!document.querySelector('[data-action="bill"]').disabled,null,{timeout:180000});
+ const billing=await(await page.request.get(`${base}/atlas/api/billing?town=${preset}`)).json();
+ assert.ok(billing.receivedReads>0);assert.ok(billing.issuedDocuments>0);
+ await page.screenshot({path:`${out}/${preset}-billing.png`,fullPage:true});
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('#connection-status').textContent==='Persistent runtime connected',null,{timeout:180000});
+ const persisted=await(await page.request.get(`${base}/atlas/api/billing?town=${preset}`)).json();
+ assert.equal(persisted.issuedDocuments,billing.issuedDocuments);
+ assert.deepEqual(errors,[]);
+ await writeFile(`${out}/${preset}-checks.json`,JSON.stringify({passed:true,preset,actualMapPick:id,through:stateAfter.through,received:billing.receivedReads,issued:billing.issuedDocuments,reloadPreserved:true,errors},null,2));
+ console.log('PASS actual map click -> account -> advance day -> receive reads -> calculate bills -> reload preserves documents.');
+}finally{await browser.close();}

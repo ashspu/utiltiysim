@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {createRequire} from 'node:module';
-const require=createRequire(import.meta.url),{chromium}=require(process.env.ATLAS_PLAYWRIGHT_MODULE||'/workspace/ui-review/node_modules/playwright-core');
-const origin=process.env.ATLAS_REVIEW_URL||'http://127.0.0.1:8041';
+import {chromium,browserOptions} from './browser-runtime.mjs';
+const origin=process.env.ATLAS_URL||process.env.ATLAS_REVIEW_URL||'http://127.0.0.1:8041';
 const town=process.env.ATLAS_TOWN_SOURCE?JSON.parse(await readFile(process.env.ATLAS_TOWN_SOURCE,'utf8')):(await(await fetch(origin+'/atlas/api/bootstrap')).json()).snapshot;
-const browser=await chromium.launch({executablePath:process.env.ATLAS_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--no-proxy-server']});
+const browser=await chromium.launch(browserOptions);
 try{
  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/__template-test__/harness',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><title>Shared template renderer check</title>'}));

@@ -24,7 +24,8 @@ def test_bounds_and_cross_field_validation():
     with pytest.raises(ValidationError):
         SimConfig.model_validate({"town": {"houses": 19}})
     with pytest.raises(ValidationError):
-        SimConfig.model_validate({"town": {"houses": 10_001}})
+        SimConfig.model_validate({"town": {"houses": 50_001}})
+    assert SimConfig.model_validate({"town": {"houses": 50_000}}).town.houses == 50_000
     with pytest.raises(ValidationError):
         SimConfig.model_validate({"ami": {"ami_route_share": 0.8, "amr_route_share": 0.3}})
     with pytest.raises(ValidationError):
@@ -46,7 +47,7 @@ def test_schema_has_ui_hints():
     defs = s["$defs"]
     town = defs["TownConfig"]
     assert town["x-group"] is True and "x-order" in town
-    assert town["properties"]["houses"]["maximum"] == 10_000
+    assert town["properties"]["houses"]["maximum"] == 50_000
     assert "x-effects" in town["properties"]["houses"]
     assert defs["ElectricConfig"]["properties"]["primary_kv"]["x-unit"] == "kV"
 

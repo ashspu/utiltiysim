@@ -1,0 +1,37 @@
+import * as THREE from '/viewer/vendor/three.module.js';
+import {createBuilding} from './review-buildings.js?v=8';
+import {createLandscape} from './review-landscape.js?v=5';
+
+// The scene consumes the same authored polygon records as the SVG, not boxes
+// positioned over unrelated art. The surrounding trace is a visual reference.
+export async function createStudy(container,data,onPick,onLandscape,onFarm){
+ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor('#dce5cf');renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.9;container.append(renderer.domElement);
+ const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(),target=new THREE.Vector3(367,0,124),ray=new THREE.Raycaster(),pointer=new THREE.Vector2(),pickables=[],buildings=[],accessoryRoofs=[];
+ let azimuth=.1,elevation=1.05,span=260,drag=null;
+ scene.add(new THREE.HemisphereLight('#fffcea','#657a5e',2.4));const sun=new THREE.DirectionalLight('#fff7df',3);sun.position.set(280,300,-60);sun.target.position.copy(target);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-150,right:150,top:150,bottom:-150,near:1,far:700});sun.shadow.normalBias=.12;scene.add(sun,sun.target);
+ const texture=await new THREE.TextureLoader().loadAsync('reference-trace.svg?v=3');texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();const ground=new THREE.Mesh(new THREE.PlaneGeometry(1536,1024),new THREE.MeshStandardMaterial({map:texture,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.set(768,-.09,512);ground.receiveShadow=true;scene.add(ground);
+ const landscape=createLandscape(scene,data,texture);pickables.push(...landscape.pickables);
+ const shape=points=>new THREE.Shape(points.map(([x,y])=>new THREE.Vector2(x,-y)));
+ function surface(points,color,height){const geometry=new THREE.ShapeGeometry(shape(points));geometry.rotateX(-Math.PI/2);const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,roughness:1,side:THREE.DoubleSide}));mesh.position.y=height;mesh.receiveShadow=true;scene.add(mesh);return mesh;}
+ function outline(points,color,height){const geometry=new THREE.BufferGeometry().setFromPoints(points.map(([x,y])=>new THREE.Vector3(x,height,y)));scene.add(new THREE.Line(geometry,new THREE.LineBasicMaterial({color})));}
+ for(const [area,color,height] of [[data.streetEnvelope,'#edeadf',.02],[data.streetSurface,'#aab3b4',.03]]){const s=shape(area.polygon);for(const hole of area.holes)s.holes.push(new THREE.Path(hole.map(([x,y])=>new THREE.Vector2(x,-y))));const g=new THREE.ShapeGeometry(s);g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,roughness:1}));m.position.y=height;m.receiveShadow=true;scene.add(m);}
+ for(const area of data.sharedAccess||[])surface(area.polygon,'#d8d4c6',.04);
+ for(const area of data.landscape.filter(a=>a.renderFill&&!a.renderTexture))surface(area.polygon,area.renderFill,.025); for(const area of data.pedestrianPaths||[])surface(area.polygon,'#d0cbb6',.035);
+ for(const [i,p] of data.properties.entries()){
+  surface(p.polygon,['#d4dba8','#dbe0b1','#d0d6a0'][i%3],.015);outline(p.polygon,'#829270',.07);surface(p.driveway,'#d8d5c4',.04);
+  const building=createBuilding(scene,p,i,data.scaleMPerPixel);pickables.push(...building.pickables);buildings.push(building.roof);if(p.pool)surface(p.pool,'#83bac7',.07);
+  for(const accessory of p.outbuildings||[]){const model={...p,...accessory,physical:{...p.physical,stories:1},solarSurfaces:[],isAccessory:true};const extra=createBuilding(scene,model,i,data.scaleMPerPixel);pickables.push(...extra.pickables);accessoryRoofs.push(extra.roof);}
+  for(const tree of p.gardenTrees||[]){const crown=new THREE.Mesh(new THREE.SphereGeometry(tree.radius,9,7),new THREE.MeshStandardMaterial({color:'#91ac74',roughness:1}));crown.position.set(tree.center[0],2,tree.center[1]);crown.castShadow=true;scene.add(crown);}
+ }
+ function render(){renderer.render(scene,camera);}
+ function update(){const distance=2000;camera.position.set(target.x+Math.sin(azimuth)*Math.cos(elevation)*distance,Math.sin(elevation)*distance,target.z+Math.cos(azimuth)*Math.cos(elevation)*distance);camera.lookAt(target);camera.updateMatrixWorld();render();}
+ function resize(){const w=container.clientWidth||1000,h=container.clientHeight||700;renderer.setSize(w,h);camera.left=-span*w/h/2;camera.right=span*w/h/2;camera.top=span/2;camera.bottom=-span/2;camera.near=.1;camera.far=6000;camera.updateProjectionMatrix();update();}
+ function zoom(f){span=Math.max(65,Math.min(1800,span*f));resize();}
+ renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY>0?1.1:1/1.1);},{passive:false});
+ renderer.domElement.addEventListener('pointerdown',e=>{if(e.button!==0)return;drag={x:e.clientX,y:e.clientY,azimuth,elevation,moved:false};renderer.domElement.setPointerCapture(e.pointerId);});
+ renderer.domElement.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>4)drag.moved=true;if(drag.moved){azimuth=drag.azimuth-dx*.006;elevation=Math.max(.35,Math.min(1.5,drag.elevation+dy*.004));update();}});
+ renderer.domElement.addEventListener('pointerup',e=>{const was=drag;drag=null;if(renderer.domElement.hasPointerCapture(e.pointerId))renderer.domElement.releasePointerCapture(e.pointerId);if(!was||was.moved)return;const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.x)/r.width*2-1,1-(e.clientY-r.y)/r.height*2);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(pickables)[0];if(hit){const record=hit.object.userData;if(record.premiseId)onPick(record.premiseId);else if(record.farmId)onFarm(record.farmId);else if(record.landscapeId)onLandscape(record.landscapeId);}});
+ renderer.domElement.addEventListener('pointercancel',()=>{drag=null;});window.addEventListener('resize',resize);
+ const stats={...landscape.stats,sharedDrives:data.sharedAccess.length,accessoryBuildings:accessoryRoofs.length,roofStyles:buildings.reduce((counts,b)=>{counts[b.userData.roofType]=(counts[b.userData.roofType]||0)+1;return counts;},{}),roofFacets:data.properties.reduce((n,p)=>n+p.roofModel.faces.length,0),projectPoint:(x,y,height=0)=>{const v=new THREE.Vector3(x,height,y).project(camera),r=renderer.domElement.getBoundingClientRect();return {x:r.x+(v.x+1)*r.width/2,y:r.y+(1-v.y)*r.height/2};},buildings:buildings.length,solarHomes:data.properties.filter(p=>p.solarPanels?.length).length,pools:data.properties.filter(p=>p.pool).length,source:'reconstruction.json footprint polygons',projected:()=>data.properties.map(p=>{const v=new THREE.Vector3(p.roofModel.pickPoint[0],p.roofModel.pickPoint[2]/data.scaleMPerPixel,p.roofModel.pickPoint[1]).project(camera),r=renderer.domElement.getBoundingClientRect();return {premiseId:p.premiseId,x:r.x+(v.x+1)*r.width/2,y:r.y+(1-v.y)*r.height/2};})};
+ resize();return {resize,zoom,stats,frame(bounds){target.set(bounds[0]+bounds[2]/2,0,bounds[1]+bounds[3]/2);span=bounds[3]*1.25;sun.position.set(target.x-100,300,target.z-180);sun.target.position.copy(target);resize();},select(id){landscape.select(id);for(const roof of [...buildings,...accessoryRoofs])roof.material.color.copy(roof.userData.premiseId===id?new THREE.Color('#cf865e'):roof.userData.baseColor);render();}};
+}

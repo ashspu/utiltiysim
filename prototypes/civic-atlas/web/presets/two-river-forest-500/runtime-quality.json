@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "civic-atlas-quality/1",
+  "generatedAt": "2026-10-11T00:53:49.233885+00:00",
+  "townId": "town-8555edb3417c90c5",
+  "through": "2026-01-08",
+  "snapshotSha256": "e9b4b8a7d56db2c833b9b5f0c38fd1f5670149ed58cdc274e28bddf7533de16a",
+  "automatedPassed": true,
+  "checks": [
+    {
+      "id": "population",
+      "title": "Homes and premises",
+      "status": "pass",
+      "detail": "451 homes; 476 premises; 1038 occupied-household residents.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "identities",
+      "title": "Stable, unique source identities",
+      "status": "pass",
+      "detail": "Premises, parcels, buildings, meters, service points and roads checked separately.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "valid-parcels",
+      "title": "Valid parcel geometry",
+      "status": "pass",
+      "detail": "476 parcel polygons checked.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "parcel-overlap",
+      "title": "No overlapping parcels",
+      "status": "pass",
+      "detail": "Intersections larger than 0.02 m² are rejected.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "containment",
+      "title": "Buildings fit their parcels",
+      "status": "pass",
+      "detail": "476 building footprints checked with 2 cm tolerance.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "pavement",
+      "title": "Parcels stay clear of road pavement",
+      "status": "pass",
+      "detail": "Uses saved road widths, not painted road edges.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "streets",
+      "title": "Connected street graph",
+      "status": "pass",
+      "detail": "103 road segments; 76 road nodes.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "frontage",
+      "title": "Property frontage reaches its assigned road",
+      "status": "pass",
+      "detail": "Checks saved frontage anchors. Painted driveways and vehicle turning still need visual review.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "open-space",
+      "title": "Public and rural land stays outside parcels",
+      "status": "pass",
+      "detail": "137 parks, fields, conservation areas and shared greens checked, including polygon holes.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "services",
+      "title": "Recorded services connect to a utility source",
+      "status": "pass",
+      "detail": "1384 meters; water, electricity and gas topology. This does not calculate pressure or voltage.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "entity-bindings",
+      "title": "Every visible property resolves to its system records",
+      "status": "pass",
+      "detail": "476 premise → building, parcel, account and service mappings. Household attributes live on each premise.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "protected-land",
+      "title": "Protected corridors exclude private parcels",
+      "status": "pass",
+      "detail": "1 original conservation and water zones checked against all parcels.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "feature-budget",
+      "title": "World-builder feature budget",
+      "status": "pass",
+      "detail": "{\"homes\": 451, \"pools\": 100, \"solar\": 0, \"school\": 1, \"church\": 1, \"commercial\": 16, \"industrial\": 6}",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "pool-geometry",
+      "title": "Every recorded pool fits its own backyard",
+      "status": "pass",
+      "detail": "Checks presence, validity, parcel containment, buildings and pavement. AI pixels are assessed separately.",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "database",
+      "title": "Saved world database integrity",
+      "status": "pass",
+      "detail": "ok",
+      "failureCount": 0,
+      "examples": []
+    },
+    {
+      "id": "observations",
+      "title": "Latest completed day has meter records",
+      "status": "pass",
+      "detail": "1384 meters; latest completed day: 2026-01-07. Missing readings remain unknown, never zero.",
+      "failureCount": 0,
+      "examples": []
+    }
+  ],
+  "reviewRequired": [
+    "Visual fidelity at town, neighborhood and property zoom requires review in the live map.",
+    "The traced master plan and native 3D appearance need visual acceptance; only the concept direction has been approved.",
+    "Painted driveway continuity, sidewalk placement and loading-yard maneuverability are not certified by frontage anchors.",
+    "Artwork registration, picking, navigation and responsive layouts are checked by the separate browser suites.",
+    "Construction commits, external integrations and authentication are not implemented in this shell."
+  ]
+}

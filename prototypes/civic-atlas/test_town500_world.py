@@ -8,6 +8,7 @@ from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from quality import geometry_checks, quality_report  # noqa: E402
 from server import prepare_world  # noqa: E402
 from town500_world import build_town500_snapshot  # noqa: E402
 
@@ -154,6 +155,10 @@ def test_fresh_world_runs_real_days_and_resumes_existing_store(tmp_path, town):
     same = prepare_world(path.parent, 500, "different-seed-does-not-regenerate", town500=True)
     assert same.status() == reopened.status()
     assert WorldMap(same).snapshot() == town
+    report = quality_report(town, same)
+    assert report['automatedPassed'], report['checks']
+    assert len(report['checks']) == 12
+    assert report['reviewRequired']
 
 
 def test_profile_refuses_to_replace_a_different_existing_world(tmp_path, town):
@@ -169,3 +174,19 @@ def test_profile_refuses_to_replace_a_different_existing_world(tmp_path, town):
         prepare_world(tmp_path, 500, "unrelated-seed", town500=True)
     assert World(path).status() == before
     assert WorldMap(World(path)).snapshot() == other
+
+
+def test_quality_detects_broken_geometry_and_disconnected_service(town):
+    import copy
+
+    broken = copy.deepcopy(town)
+    broken['parcels'][1]['polygon'] = broken['parcels'][0]['polygon']
+    broken['premises'][0]['front']['x'] += 50
+    broken['premises'][0]['front']['z'] += 50
+    broken['servicePoints'][0]['networkNodeId'] = 'missing-node'
+    checks = {c['id']: c for c in geometry_checks(broken)}
+    assert checks['parcel-overlap']['status'] == 'fail'
+    assert checks['containment']['status'] == 'fail'
+    assert checks['frontage']['status'] == 'fail'
+    assert checks['services']['status'] == 'fail'
+    assert all(c['status'] == 'pass' for c in geometry_checks(town))

@@ -8,6 +8,7 @@ import {naturalizeLandscape,renderNaturalBanks} from './map-landscape.js';
 import {installGrassPalette} from './map-grass.js';
 import {renderParcelGardens} from './map-gardens.js';
 import {renderPublicSpace} from './map-public-space.js';
+import {renderPresetLand} from './map-preset-land.js';
 import {createBuildingSprites} from './map-building-sprites.js';
 import {replaceTreeAssets,replaceCivicAssets,addResidentialCharacter,groundTexture,renderParks,renderAtlasDesign,applyBuildingFamilies,renderTownCenter,renderWaterTowers} from './map-assets.js';
 import {addStreetMarkings,softenTrees,makeStreetLabels,enrichNeighborhood,refineStreetSurfaces} from './map-art.js';
@@ -134,6 +135,8 @@ export class AtlasMap {
     this.neighborhoodArt=enrichNeighborhood(s,this.town);
     this.gardenArt=renderParcelGardens(s,this.town);
     this.landscapeArt=naturalizeLandscape(s,this.town);
+    this.presetLand=renderPresetLand(s,this.town);
+    if(this.presetLand)this.abort.signal.addEventListener('abort',()=>this.presetLand.destroy(),{once:true});
     if(this.town.atlasDesign?.version?.startsWith('civic-atlas-town500/')){
       this.publicSpaceArt=renderPublicSpace(s,this.town);
       const matrix=new THREE.Matrix4(),position=new THREE.Vector3();
@@ -456,6 +459,7 @@ export class AtlasMap {
   clearSelection() {this.selected=null;this.illustratedFoliage?.setSelected(null);this.clearParcelHighlight();this.scene.clearSelection();this.refreshBlockOverlays();}
   setLayer(layer) {
     this.layer=layer;
+    this.presetLand?.setZoning(layer==='zoning');
     this.scene.setLayers({water:layer==='water',electric:layer==='electric',gas:layer==='gas'});
     if(this.selected)this.select(this.selected);
     this.refreshBlockOverlays();

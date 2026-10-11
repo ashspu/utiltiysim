@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "lantern-bay-500",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 614654,
+      "rawBytes": 6826426,
+      "sha256": "9fc933cb8ba1a0be056ccaa57122241df4f9ac81ccfc0bf379bd4d0be102dc39",
+      "rawSha256": "4586af9348a808455a02a8578a0e193a03ced2593c945e216a765317f67e992a"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 196904,
+      "rawBytes": 1080425,
+      "sha256": "303a143c1db4570fac3d1871b6bf480bfd311d220aef448c5645d51a0ad101f1",
+      "rawSha256": "0b6570f5230521395455955dd415d2346fb5a29343cfe17b3e4466a8965440c3"
+    }
+  ]
+}

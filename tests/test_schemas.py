@@ -52,3 +52,15 @@ def test_generated_schemas_are_current():
         committed = schemas.load(name)
         assert orjson.dumps(committed, option=orjson.OPT_SORT_KEYS) == orjson.dumps(doc, option=orjson.OPT_SORT_KEYS), \
             f"schemas/{schemas.NAMES[name]} is stale: run `uv run utilsim schema --all`"
+
+
+def test_large_preset_counts_allow_home_tolerance_and_nonresidential_premises():
+    from jsonschema import Draft202012Validator
+
+    properties = schemas.load("utility-town-2.0")["properties"]
+    homes = Draft202012Validator(properties["homes"])
+    assert homes.is_valid(50_000) and homes.is_valid(55_000)
+    assert not homes.is_valid(55_001)
+    assert Draft202012Validator(properties["count"]).is_valid(57_500)
+    # Non-residential accounts are additional premises, not hidden home slots.
+    assert "maxItems" not in properties["premises"]

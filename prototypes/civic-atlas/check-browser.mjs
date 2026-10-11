@@ -2,16 +2,12 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-const modulePath = process.env.PLAYWRIGHT_MODULE || new URL('../../out/civic-atlas/browser/node_modules/playwright-core/index.mjs', import.meta.url).href;
-const { chromium } = await import(modulePath);
+import {chromium,browserOptions} from './browser-runtime.mjs';
 const base = process.env.ATLAS_URL || 'http://127.0.0.1:8040';
 const artQuery = ['blocks','native'].includes(process.env.ATLAS_ART) ? '?art='+process.env.ATLAS_ART : '';
 const output = process.env.ATLAS_REVIEW_OUTPUT || fileURLToPath(new URL('../../out/civic-atlas/review/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true,
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--no-proxy-server'],
-});
+const browser = await chromium.launch(browserOptions);
 const errors = [];
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
@@ -29,7 +25,9 @@ try {
   assert.match(await page.locator('#hero-geography').textContent(),/concept landscape/);
   await page.locator('.welcome-actions [data-page="map"]').click();
   assert.equal(await page.locator('#map-page').isVisible(),true,'welcome resumes actual map');
-  assert.equal(await page.locator('.sidebar').isVisible(),true,'workspace navigation returns');
+  assert.equal(await page.locator('.sidebar').isVisible(),false,'map navigation starts hidden');
+  const options=async()=>{if(!await page.locator('#map-options').isVisible())await page.locator('#toggle-map-options').click();};
+  await options();
   if(await page.locator('#map-art-toggle').isEnabled()){
     const before=await diagnostics();
     await page.locator('#map-art-toggle').click();
@@ -67,7 +65,7 @@ try {
   assert.ok(Math.hypot(...direction(zoomed)) < Math.hypot(...direction(panned)), 'logical zoom distance');
   assert.ok(zoomed.frustum[2] - zoomed.frustum[3] < panned.frustum[2] - panned.frustum[3], 'wheel narrows orthographic view');
 
-  await page.locator('#build-mode').click();
+  await options();await page.locator('#build-mode').click();await page.locator('#close-map-options').click();
   await page.mouse.click(x, y);
   assert.equal((await diagnostics()).draft.points.length, 1);
   await page.mouse.move(x + 40, y + 20);
@@ -90,7 +88,7 @@ try {
   assert.equal(draft.points.length, 2);
   assert.equal(draft.committed, false);
   const downloadPending = page.waitForEvent('download');
-  await page.locator('#export-sketch').click();
+  await options();await page.locator('#export-sketch').click();
   const download = await downloadPending;
   assert.deepEqual(JSON.parse(await readFile(await download.path(), 'utf8')), draft);
   await page.screenshot({ animations: 'disabled', path: `${output}/road-sketch.png` });
@@ -98,26 +96,27 @@ try {
   await ready();
   assert.deepEqual((await diagnostics()).draft, draft, 'draft persists in browser');
 
-  await page.locator('#sample-property').click();
+  await options();await page.locator('#map-search').fill('P-00001');await page.locator('#search-results button').first().click();await page.locator('#close-map-options').click();await page.locator('#view-property').click();
   await page.waitForSelector('.reading-value');
   const selected = await diagnostics();
   assert.ok(selected.selectedId);
   await page.locator('[data-asset="electric"]').click();
   assert.match(await page.locator('.inspector-section h3').first().textContent(), /Electricity/);
   await page.screenshot({ animations: 'disabled', path: `${output}/property-record.png` });
-  await page.locator('.sidebar nav [data-page="configure"]').click();
+  await page.locator('#close-property-dialog').click();await page.locator('#open-navigation').click();await page.locator('.sidebar nav [data-page="configure"]').click();
   await page.locator('.sidebar nav [data-page="map"]').click();
   assert.deepEqual((await diagnostics()).camera, selected.camera);
   assert.equal((await diagnostics()).selectedId, selected.selectedId);
   // A compact inspector need not overflow a tall desktop; exercise a short window.
   await page.setViewportSize({ width: 1280, height: 700 });
+  await page.locator('#view-property').click();
   const inspector = await page.locator('#inspector').boundingBox();
   await page.mouse.move(inspector.x + 70, inspector.y + 200);
   await page.mouse.wheel(0, 350);
   await page.waitForFunction(() => document.querySelector('#inspector').scrollTop > 0);
   assert.deepEqual((await diagnostics()).camera, selected.camera, 'panel scroll does not pan town');
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.locator('[data-layer="water"]').click();
+  await page.locator('#close-property-dialog').click();await options();await page.locator('[data-layer="water"]').click();
   assert.match(await page.locator('#legend-text').textContent(), /topology, not live flow/);
   await page.screenshot({ animations: 'disabled', path: `${output}/water-topology.png` });
 
@@ -137,6 +136,7 @@ try {
     assert.equal((await diagnostics()).through, after.state.through, 'saved day survives reopening');
   }
   const beforeFailure = (await diagnostics()).through;
+  await options();
   await page.route('**/atlas/api/advance', route => route.fulfill({
     status: 409, contentType: 'application/json',
     body: JSON.stringify({ detail: 'This view is out of date. Refresh before advancing.' }),

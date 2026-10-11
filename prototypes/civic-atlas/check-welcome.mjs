@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-const modulePath = process.env.PLAYWRIGHT_MODULE || new URL('../../out/civic-atlas/browser/node_modules/playwright-core/index.mjs', import.meta.url).href;
-const { chromium } = await import(modulePath);
+import {chromium,browserOptions} from './browser-runtime.mjs';
 const output = process.env.ATLAS_WELCOME_OUTPUT || fileURLToPath(new URL('../../out/civic-atlas/welcome-review/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--no-proxy-server'] });
+const browser = await chromium.launch(browserOptions);
 const errors=[];
 try {
  const page=await browser.newPage({viewport:{width:1600,height:1000}});

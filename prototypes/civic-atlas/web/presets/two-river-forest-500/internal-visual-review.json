@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "d0daa9ee727aafa50c198b2857fe2ada0c57a372671cb13358e469d6c4f0006d",
+  "reviewedAt": "2026-10-11T02:32:36.253235+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Retained authored two-river landscape and 451 mapped homes; internal overview, property detail, picking and tile continuity inspected.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

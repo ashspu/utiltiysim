@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "ashtown-5000",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 5318468,
+      "rawBytes": 61713146,
+      "sha256": "01e38b9fa55a9474771c05234947b4be7e0427aabf439eac8a96f720947e6513",
+      "rawSha256": "defb186595d032e2a2d6c3bf224f1f7606010be8b1477a3ca73427ee30edee9e"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 1765993,
+      "rawBytes": 9950834,
+      "sha256": "0b9383e59bbd0018fb5d27542bd1819d6e682be060b41be2b59d79263e0330df",
+      "rawSha256": "22ad644c02f4a1061c8b944efe48d300ddd9b614c092ebfa459196cdc8de60d5"
+    }
+  ]
+}

@@ -99,7 +99,7 @@ class TownConfig(BaseModel):
     model_config = group("Town & geography", 1, "Size, street grid, terrain and land use. Towns are generic: "
                          "every street comes from these settings and the seed.")
     drop_removed_settings = _drop_removed("town")
-    houses: int = F(480, "Number of residential premises to place.", ge=20, le=10_000,
+    houses: int = F(480, "Number of residential premises to place.", ge=20, le=50_000,
                     effects=["town extent", "era mix", "substations", "feeders", "pipe sizes", "MRUs"])
     units: Literal["ontario", "us", "uk"] = F("ontario", "Display unit profile (stored values are always SI).")
     street_pattern: Literal["legacy", "neighborhoods"] = F(

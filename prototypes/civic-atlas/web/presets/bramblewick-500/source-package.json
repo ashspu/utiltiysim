@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "bramblewick-500",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 625623,
+      "rawBytes": 6944487,
+      "sha256": "4ceec6dbe21bd9b2a0574b1e1496eff26cf2a9e26b149b6d978bb70e07368ba9",
+      "rawSha256": "a055ee877b74516f48ec966b832ecbfd01bd658bf05fea807969fe3739fa8c1f"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 201621,
+      "rawBytes": 1097285,
+      "sha256": "4f6da64b5b00a8b1816e8b1a2245ff0bec597ebdc3300bf77e7bf9288dfe2adc",
+      "rawSha256": "73f225aa3d0cdfb5c38b49d28d044c8e8d440bf4aad58ae60260e60de9a7f92a"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+.git
+.venv
+.vercel
+.env
+.env.*
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+out
+public
+examples
+.utilsim_cache
+prototypes/civic-atlas/handoff
+prototypes/civic-atlas/web/presets/riverbend-500
+prototypes/civic-atlas/web/presets/*/snapshot.json
+prototypes/civic-atlas/web/presets/*/geometry.json

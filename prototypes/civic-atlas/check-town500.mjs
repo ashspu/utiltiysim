@@ -4,12 +4,12 @@
 // PLAYWRIGHT_MODULE=/path/to/playwright-core/index.mjs node prototypes/civic-atlas/check-town500.mjs
 import assert from 'node:assert/strict';
 import {mkdir,rm,writeFile} from 'node:fs/promises';
-const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||new URL('../../out/civic-atlas/browser/node_modules/playwright-core/index.mjs',import.meta.url).href);
+import {chromium,browserOptions} from './browser-runtime.mjs';
 const base=process.env.ATLAS_URL||'http://127.0.0.1:8041';
 const output=process.env.ATLAS_REVIEW_OUTPUT||'out/civic-atlas/review-town500';
 await mkdir(output,{recursive:true});
 await Promise.all(['checks.json','failure.json','failure.png'].map(name=>rm(`${output}/${name}`,{force:true})));
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--no-proxy-server']});
+const browser=await chromium.launch(browserOptions);
 const errors=[],screenshots=[],mousePicks=[],registration=[],tourChecks=[];
 let page;
 try{
@@ -69,7 +69,8 @@ try{
  assert.ok(registration.some(t=>t.solarSlots>0)&&registration.some(t=>t.poolSlots>0));
  console.log('CHECK: every template placement matches saved physical geometry and solar/pool conditions.');
 
- const visit=async id=>{await page.locator('#place-tour').selectOption(id);await frame();tourChecks.push(id);};
+ const options=async()=>{if(!await page.locator('#map-options').isVisible())await page.locator('#toggle-map-options').click();};
+ const visit=async id=>{await options();await page.locator('#place-tour').selectOption(id);await page.locator('#close-map-options').click();await frame();tourChecks.push(id);};
  const clickRoof=async(home,block)=>{
   await visit('block:'+block.id);
   const point=await page.evaluate(async home=>{
@@ -108,12 +109,14 @@ try{
 
  // Search and source-driven destinations remain independent of artwork.
  const searchHome=town.premises.find(p=>p.buildingType==='church');
+ await options();
  await page.locator('#map-search').fill('church');await page.locator('#search-results button').first().waitFor();
  await page.locator('#map-search').press('Enter');await page.waitForFunction(id=>window.atlasDiagnostics().selectedId===id,searchHome.id);
  for(const district of districts){await visit('district:'+district.id);assert.ok((await page.locator('#legend-text').textContent()).includes(district.name));}
  const field=design.fields[0];await visit('field:'+field.id);assert.match(await page.locator('#legend-text').textContent(),/no farm production/);
  await shot('countryside-land-use');
  const sample=design.blocks.find(b=>b.kind==='residential');await visit('block:'+sample.id);
+ await options();
  for(const layer of ['water','electric','gas']){
   await page.locator(`[data-layer=${layer}]`).click();assert.equal(await page.locator(`[data-layer=${layer}]`).evaluate(el=>el.classList.contains('active')),true);
   assert.match(await page.locator('#legend-text').textContent(),/topology, not live flow/);await shot(`${layer}-network`);
@@ -123,11 +126,12 @@ try{
  const native=await diagnostics();assert.equal(native.artwork.enabled,false);assert.equal(native.artwork.count,0);assert.deepEqual(native.camera,framed.camera);assert.deepEqual(native.target,framed.target);
  await shot('native-same-camera');await page.locator('#map-art-toggle').click();assert.equal((await diagnostics()).artwork.count,58);await shot('illustrated-same-camera');
  const canvas=page.locator('#map-canvas canvas'),rect=await canvas.boundingBox(),x=rect.x+rect.width*.48,y=rect.y+rect.height*.54;
+ await page.locator('#close-map-options').click();
  const prePan=await diagnostics();await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+70,y+25,{steps:6});await page.mouse.up();await frame();
  const postPan=await diagnostics();assert.notDeepEqual(postPan.target,prePan.target);
  const direction=d=>d.camera.map((v,i)=>v-d.target[i]);assert.ok(direction(prePan).every((v,i)=>Math.abs(v-direction(postPan)[i])<1e-6),'pan preserves fixed angle');
  await page.mouse.wheel(0,-120);await frame();const zoomed=await diagnostics();assert.ok(zoomed.frustum[2]-zoomed.frustum[3]<postPan.frustum[2]-postPan.frustum[3]);
- await page.locator('#zoom-out').click();await frame();assert.ok((await diagnostics()).frustum[2]-(await diagnostics()).frustum[3]>zoomed.frustum[2]-zoomed.frustum[3]);
+ await options();await page.locator('#zoom-out').click();await page.locator('#close-map-options').click();await frame();assert.ok((await diagnostics()).frustum[2]-(await diagnostics()).frustum[3]>zoomed.frustum[2]-zoomed.frustum[3]);
 
  // Home counts, source names and presentation at both evaluation widths.
  for(const width of [1600,1024]){

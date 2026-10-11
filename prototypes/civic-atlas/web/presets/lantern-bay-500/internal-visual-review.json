@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "0b6570f5230521395455955dd415d2346fb5a29343cfe17b3e4466a8965440c3",
+  "reviewedAt": "2026-10-11T02:32:36.265345+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Coastal town with a shifted civic core and a distinct waterfront street layout; internal whole-town and property-scale rendered review completed.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/welcome.css">
 <link rel="stylesheet" href="/overview.css">
 <link rel="stylesheet" href="/city-design.css">
+<link rel="stylesheet" href="/map-workspace.css">
 <script type="importmap">{"imports":{"three":"/viewer/vendor/three.module.js"}}</script>
 </head>
 <body>
@@ -24,6 +25,7 @@
     <button data-page="map"><i data-icon="map"></i>Town map</button>
     <button data-page="city-design"><i data-icon="home"></i>City design</button>
     <button data-page="connections"><i data-icon="connections"></i>Connections</button>
+    <button data-page="quality"><i data-icon="check"></i>Quality checks</button>
   </nav>
   <div class="sidebar-bottom"><div class="world-note"><span class="saved-dot"></span>Engine-backed world<small>Geography and readings from<br>the UtilitySim runtime.</small></div><button id="about-button"><i data-icon="info"></i>About this prototype <span>↗</span></button></div>
 </aside>
@@ -67,7 +69,8 @@
   <h1 class="visually-hidden">Brookfield · Town map</h1>
   <div class="map-toolbar"><div class="search-wrap"><i data-icon="search"></i><input id="map-search" placeholder="Find an address or property…" aria-label="Find an address or property" autocomplete="off"><kbd>/</kbd><div id="search-results" hidden></div></div><div class="layer-tabs" aria-label="Utility layers"><button data-layer="town" class="active">Town</button><button data-layer="water"><i data-icon="water"></i>Water</button><button data-layer="electric"><i data-icon="electric"></i>Electricity</button><button data-layer="gas"><i data-icon="gas"></i>Gas</button></div><div class="segmented map-mode-switch" aria-label="Map mode"><button id="explore-mode" class="active">Explore</button><button id="build-mode"><i data-icon="pencil"></i>Sketch</button></div></div>
   <div class="map-body"><div id="map-stage"><div id="map-canvas" tabindex="0" aria-label="Town map. Drag to pan, wheel to zoom, arrow keys to pan."></div><div class="map-caption"><span class="saved-dot"></span><span id="map-caption-text">Saved geography · physical world records</span><span id="map-art-status" class="map-art-status" role="status" aria-live="polite" hidden></span></div><div class="map-controls"><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><span></span><button id="fit-map" aria-label="Show whole town"><i data-icon="fit"></i></button><button id="map-art-toggle" aria-label="Toggle illustrated blocks" aria-pressed="false" disabled title="Illustrated blocks loading"><i data-icon="layers"></i></button><button id="find-selection" aria-label="Find selected property"><i data-icon="target"></i></button></div><label class="place-tour">Explore a place <select id="place-tour"><option value="">Choose a destination…</option></select></label><div id="map-legend"><span class="legend-line"></span><span id="legend-text">Select a property to explore</span></div><div id="sketch-tools" hidden><div><span class="draft-dot"></span><strong>Road sketch</strong><span class="pill">PLANNING ONLY</span></div><p>Click to place points. Space + drag to pan.</p><label><input id="frontage" type="checkbox" checked> Illustrate residential frontage</label><div class="sketch-metrics"><b id="sketch-length">0 m</b><span id="sketch-points">0 points</span></div><div class="sketch-actions"><button id="undo-sketch">Undo</button><button id="clear-sketch">Clear</button><button id="export-sketch" class="primary">Export draft</button></div><small>Saved in this browser. No roads, homes, or services are committed to the simulation.</small></div></div>
-  <aside id="inspector" aria-label="Property details"><div id="inspector-content"></div></aside></div>
+  </div>
+  <dialog id="property-dialog" aria-label="Selected property records"><button id="close-property-dialog" aria-label="Close property records">×</button><section id="inspector" aria-label="Property details"><div id="inspector-content"></div></section></dialog>
   <footer class="map-footer"><div class="date-block"><i data-icon="calendar"></i><span><small>WORLD SAVED THROUGH</small><strong id="map-date">—</strong><small id="map-next-date" class="next-day">—</small></span></div><div class="day-history" id="day-history"></div><button class="primary advance-button"><i data-icon="play"></i>Simulate next day</button></footer>
 </section>
 <section id="overview-page" class="page content-page" hidden></section>
@@ -75,6 +78,7 @@
 <section id="activity-page" class="page content-page" hidden></section>
 <section id="city-design-page" class="page content-page" hidden></section>
 <section id="connections-page" class="page content-page" hidden></section>
+<section id="quality-page" class="page content-page" hidden></section>
 </main>
 </div></div>
 <div id="toast" role="status" aria-live="polite"></div>

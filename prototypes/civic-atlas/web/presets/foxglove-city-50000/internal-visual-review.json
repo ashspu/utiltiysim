@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "2eb31e1b919dfe747a51f0eeccf7c9a6053b789acb478b5cf714ed602425da63",
+  "reviewedAt": "2026-10-11T02:32:36.640260+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Western and northeastern rivers, central civic green and southeast industrial district frame varied populated blocks. Final 46,360-home layout and rendered property detail reviewed.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

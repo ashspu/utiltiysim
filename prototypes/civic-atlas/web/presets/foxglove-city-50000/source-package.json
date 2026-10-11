@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "foxglove-city-50000",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 53487550,
+      "rawBytes": 637037691,
+      "sha256": "8d1695471db20a3ba11bb00c1e5236203ad6b656f943e385d0030a3f141ca5ec",
+      "rawSha256": "25e1011cf812294e6d38be5274b9779dea645b319edbf94842bf6d6edca9b726"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 15342054,
+      "rawBytes": 95851312,
+      "sha256": "dc8e7852183f0afe344f9a4a40386429dc8e02fa56246665736cd2f0d53875cf",
+      "rawSha256": "2eb31e1b919dfe747a51f0eeccf7c9a6053b789acb478b5cf714ed602425da63"
+    }
+  ]
+}

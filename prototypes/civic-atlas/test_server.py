@@ -134,3 +134,25 @@ def test_startup_resumes_existing_store_without_regeneration(tmp_path):
     assert resumed.status() == before
     with resumed.db() as db:
         assert resumed.metadata(db)["seed"] == "FIRST"
+
+
+def test_property_history_is_paginated_and_preserves_missing_readings(world, source):
+    identity = source['premises'][0]['id']
+    other = source['premises'][1]['id']
+    with world.db() as db:
+        meter = db.execute('SELECT id FROM assets WHERE premise=? LIMIT 1', (identity,)).fetchone()[0]
+        db.execute('DELETE FROM observations WHERE asset=? AND day=?', (meter, '2026-01-02'))
+    before = Path(world.path).read_bytes()
+    with client(world) as c:
+        newest = c.get(f'/atlas/api/premises/{identity}/history?limit=1').json()
+        older = c.get(f'/atlas/api/premises/{identity}/history?limit=1&offset=1').json()
+        assert newest['totalDays'] == 2
+        assert newest['days'] == ['2026-01-02'] and older['days'] == ['2026-01-01']
+        missing = next(r for r in newest['readings'] if r['assetId'] == meter)
+        assert missing['observedQuantity'] is None and missing['physicalQuantity'] is not None
+        assert all(other not in r['assetId'] for r in newest['readings'])
+        assert c.get(f'/atlas/api/premises/{identity}/history?offset=99').json()['readings'] == []
+        assert c.get(f'/atlas/api/premises/{identity}/history?offset=-1').status_code == 422
+        assert c.get(f'/atlas/api/premises/{identity}/history?limit=31').status_code == 422
+        assert c.get('/atlas/api/premises/missing/history').status_code == 404
+    assert Path(world.path).read_bytes() == before

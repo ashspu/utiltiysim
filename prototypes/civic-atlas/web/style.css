@@ -181,6 +181,13 @@ nav button{font-size:13px;gap:11px;padding:12px 12px}
 .map-art-status[data-state="fallback"]{color:#806450}
 
 /* Rendering comparison stays available without changing the saved world. */
+.quality-summary,.history-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:20px 0;color:#526b72;font-size:12px}
+.quality-check{display:grid;grid-template-columns:64px 1fr;gap:16px;padding:18px 0;border-top:1px solid #e5ece8}
+.quality-check h3{font-size:14px;margin:0 0 5px}.quality-check p{margin:0;line-height:1.6}
+.quality-result{font-size:10px;letter-spacing:.08em;font-weight:700;padding-top:3px}.quality-review{margin:24px 0}
+.quality-review li{margin-bottom:12px;line-height:1.6;color:#526b72}.source-hash{overflow-wrap:anywhere;font-size:12px}
+.record-id{display:block;font-size:10px;color:#526b72;margin-top:5px}.history-pagination button{padding:10px 15px;border:1px solid #cddbd5;border-radius:5px;background:white;color:#245c62}
+.history-pagination button:disabled{opacity:.45;cursor:default}.activity-filter>span{align-self:center;color:#526b72;font-size:12px;margin-left:auto}
 #map-art-toggle[aria-pressed="true"]{background:#e0f1f1;color:#007b88;border-radius:4px}
 
 .place-tour{position:absolute;left:18px;bottom:68px;z-index:5;display:grid;gap:6px;padding:12px 14px;background:#fffffff2;border:1px solid #dce4db;border-radius:8px;box-shadow:0 3px 12px #163b4420;color:#234453;font-size:10px;font-weight:600;letter-spacing:.04em}.place-tour select{max-width:215px;padding:6px 20px 6px 0;border:0;background:transparent;color:#173f49;font:500 12px inherit;letter-spacing:0}.map-page:has(#sketch-tools:not([hidden])) .place-tour{display:none}

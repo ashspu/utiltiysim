@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "d39d99dd57a67d7c9cc1d6e51b998c144ac72f7b5b5f4d0602b42e5076161ac6",
+  "reviewedAt": "2026-10-11T02:32:36.420907+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Two river corridors subdivide the town into varied connected blocks. Riverbank parallel-street bands were rejected and rebuilt; final 23,249-home layout and rendered detail reviewed.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

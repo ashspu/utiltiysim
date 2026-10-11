@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "willowmere-25000",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 26742813,
+      "rawBytes": 316960897,
+      "sha256": "277c7dbbaff970be7620393f0dfc195cacd638dd26c1c200de44c826eedf9d92",
+      "rawSha256": "1e2aee7c195b538b52020e04c8d2b568c6ed042968aa87e05635c98eb22df57a"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 7863020,
+      "rawBytes": 48505717,
+      "sha256": "22269e4025a9919ffa9ebe221440189689d8eb50bc1f7e7ff142487f1c4f6e31",
+      "rawSha256": "d39d99dd57a67d7c9cc1d6e51b998c144ac72f7b5b5f4d0602b42e5076161ac6"
+    }
+  ]
+}

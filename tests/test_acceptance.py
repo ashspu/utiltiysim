@@ -212,7 +212,7 @@ def test_demand_shapes_integrate_to_daily_totals(town120):
 
 
 def test_invalid_inputs_fail_loudly():
-    for n in (0, 19, 10_001):
+    for n in (0, 19, 50_001):
         with pytest.raises(ValidationError):
             SimConfig.model_validate({"town": {"houses": n}})
     with pytest.raises(ValidationError):

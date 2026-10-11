@@ -3,6 +3,8 @@ import {renderOverview} from './overview.js';
 import {AtlasMap} from './map.js';
 import {SCHOOL_BLOCK,RESIDENTIAL_BLOCKS} from './map-block-plate.js';
 import {propertyPreview} from './map-preview.js';
+import {createRecordsViews} from './workspace-records.js';
+import {createMapWorkspace} from './map-workspace.js';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'Not recorded').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nf=new Intl.NumberFormat('en');
@@ -38,16 +40,20 @@ function icons(root=document){root.querySelectorAll('[data-icon]').forEach(el=>e
 let town,state,map,selected,detail,requestVersion=0,page='welcome',busy=false,filter='days';
 let toastTimer,mapImage;
 let stateStale=false;
+const mapWorkspace=createMapWorkspace();
+const records=createRecordsViews({api,esc,fmt,day,route,getTown:()=>town,getArtwork:()=>map.blockArtStats||{},onMap:home=>selectProperty(home)});
 const geographyCaption=()=>worldProfile(town,state).caption;
 function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),4500);}
 async function api(path,options){const response=await fetch('/atlas/api/'+path,{...options,headers:{'Content-Type':'application/json',...options?.headers}});const data=await response.json();if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'The request could not be completed.');return data;}
 function route(next,replace=false){
- if(!['welcome','map','overview','configure','activity','connections','city-design'].includes(next))next='welcome';
+ if(!['welcome','map','overview','configure','activity','connections','city-design','quality'].includes(next))next='welcome';
  page=next;
  document.body.dataset.view=next;
+ mapWorkspace.view(next);
  document.querySelectorAll('.page').forEach(el=>el.hidden=el.id!==next+'-page');
  document.querySelectorAll('nav [data-page]').forEach(el=>{el.classList.toggle('active',el.dataset.page===next);if(el.dataset.page===next)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
- $('page-title').textContent={welcome:'Welcome',map:'Town map',overview:'Overview',configure:'Configure',activity:'Activity',connections:'Connections','city-design':'City design'}[next];
+ $('page-title').textContent={welcome:'Welcome',map:'Town map',overview:'Overview',configure:'Configure',activity:'Activity',connections:'Connections','city-design':'City design',quality:'Quality checks'}[next];
+ if(next==='quality')records.quality();
  map?.setVisible(next==='map');
  if(next!=='map')window.scrollTo(0,0);
  if(!replace&&location.hash!=='#'+next)history.pushState(null,'','#'+next);
@@ -94,6 +100,7 @@ function refreshViews(){
  icons();
 }
 function renderActivity(){
+ if(records.activeHistory){records.history();return;}
  const dayRows=state.daysHistory.map(d=>`<tr><td>${day(d.day)}</td><td>Physical day completed</td><td>${fmt(d.observations)} observations</td><td>${fmt(d.temperature)} °C</td><td><span class="status-good">Saved</span></td></tr>`).join('');
  const events=state.events.map(e=>`<tr><td>${day(e.day)}</td><td>${esc(e.type.replace(/([a-z])([A-Z])/g,'$1 $2'))}</td><td colspan="2">${esc(e.subject)}</td><td><span class="status-good">Recorded</span></td></tr>`).join('');
  $('activity-page').innerHTML=heading('DURABLE PHYSICAL HISTORY','See what actually happened.',`${fmt(state.observations)} observations across ${fmt(state.days)} completed days. History persists when the world is reopened.`,`<button class="primary advance-button" ${busy||state.managedDelivery||state.manualAdvanceAllowed===false?'disabled':''}>${icon('play')}${busy?'Simulating…':'Simulate next day'}</button>`)+`<div class="activity-filter"><button data-filter="days" class="${filter==='days'?'active':''}">Completed days</button><button data-filter="events" class="${filter==='events'?'active':''}">World events</button></div><div class="panel"><h2>${filter==='days'?'A daily record of the world':'The physical event journal'}</h2><p>${filter==='days'?'Latest 30 days · UTC physical-day boundaries':'Latest 40 events · original world identities'}</p><div class="table-scroll"><table class="activity-table"><thead><tr><th>PHYSICAL DATE</th><th>EVENT</th><th>${filter==='days'?'OBSERVATIONS':'SUBJECT'}</th><th>${filter==='days'?'WEATHER':''}</th><th>STATE</th></tr></thead><tbody>${(filter==='days'?dayRows:events)||'<tr><td colspan="5" class="empty-table">No records have been committed yet.</td></tr>'}</tbody></table></div></div><div class="notice">Daily history is a record of committed outcomes. Historical rewind and animated replay are not part of this prototype.</div>`;
@@ -115,9 +122,11 @@ function propertySchematic(home){
  return `<svg viewBox="0 0 200 130" aria-hidden="true" data-schematic="${family}">${base}${detail}</svg>`;
 }
 function emptyInspector(){
+ mapWorkspace.selection(null);
  $('inspector-content').innerHTML=`<div class="inspector-head"><div class="property-preview">${houseSVG}</div><span class="eyebrow">A CLOSER LOOK</span><h2>Every property<br>has a story.</h2><p>Select a building on the map or search for an address to explore its physical records.</p></div><div class="inspector-section"><h3>${icon('map')}Your town at a glance</h3>${row('Homes',fmt(town.homes))}${row('All premises',fmt(town.count))}${Array.isArray(town.parks)?row('Saved parks',fmt(town.parks.length)):''}${row('Physical meters',fmt(state.assets))}<button id="sample-property" class="inspector-button">Explore a residential property <span>→</span></button></div><div class="inspector-section"><h3>${icon('info')}Living World · administrator</h3><p class="inspector-note">This map inspects physical truth. These records are not automatically known to operational systems.</p></div>`;
 }
 async function selectProperty(home,focus=false){
+ mapWorkspace.selection(home);
  const version=++requestVersion;selected=home;detail=null;map.select(home);if(map.layer==='town')$('legend-text').textContent=home.address+' · selected property';if(focus)map.focus(home,true);
  $('search-results').hidden=true;$('map-search').value='';
  $('inspector-content').innerHTML=`<div class="inspector-head"><span class="eyebrow">PROPERTY RECORD</span><h2>${esc(home.address)}</h2><p>Opening saved physical records…</p></div>`;
@@ -126,7 +135,7 @@ async function selectProperty(home,focus=false){
 }
 function renderProperty(utility){
  if(!detail)return;utility??=(map.layer==='town'?'water':map.layer);const a=detail.assets.find(a=>a.commodity===utility),p=detail.premise;
- $('inspector-content').innerHTML=`<div class="inspector-head has-selection"><div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">PROPERTY RECORD</span><button id="close-inspector" aria-label="Clear property selection">×</button></div><div class="property-identity"><div id="selected-property-preview" class="property-preview" title="Schematic fallback while the saved-property preview loads">${propertySchematic(selected)}<span class="schematic-label">SCHEMATIC</span></div><div><h2>${esc(p.address)}</h2><p class="property-character">${esc(selected.buildingType.replaceAll('_',' '))} · ${esc(selected.premiseType)}</p></div></div><div class="property-state"><span class="pill">${p.occupied?'Occupied':'Vacant'}</span><span>${selected.premiseType==='residential'?`${fmt(p.occupants)} ${p.occupants===1?'resident':'residents'}`:'Nonresidential property'}</span></div></div><div class="asset-tabs">${['water','electric','gas'].map(u=>`<button data-asset="${u}" class="${u===utility?'active':''}">${u==='electric'?'Electric':u[0].toUpperCase()+u.slice(1)}</button>`).join('')}</div><div class="inspector-section"><h3>${icon(utility)}${utility==='electric'?'Electricity':utility[0].toUpperCase()+utility.slice(1)} service</h3>${a?`<div class="data-row"><span>Device condition</span><span class="${a.condition==='healthy'?'status-good':'status-warn'}">${esc(a.condition)}</span></div><span class="eyebrow" style="font-size:8px;margin-top:19px">RECORDED DAILY USE</span><div class="reading-value">${fmt(a.observed_quantity)} <small>${unit(a.unit)}</small></div><p class="inspector-note">${day(detail.lastCompletedDay)} · ${esc(a.observed_status||'No observation')}</p>${row('Physical use',`${fmt(a.true_quantity)} ${unit(a.unit)}`)}${row('Meter',esc(a.id))}${row('Installed',esc(a.installed))}`:'<p class="inspector-note">No physical meter is recorded for this service.</p>'}</div><div class="inspector-section"><h3>${icon(selected.premiseType==='residential'?'home':'overview')}Physical property</h3>${row('Occupancy',p.occupied?'Occupied':'Vacant')}${selected.premiseType==='residential'?row('Residents',fmt(p.occupants)):row('Property use',esc(selected.premiseType))}${row('Floor area',`${fmt(p.floorAreaM2)} m²`)}${row('Built',esc(selected.yearBuilt))}${row('Property reference',esc(p.id))}${selected.buildingType==='church'&&town.atlasDesign?.churchDemandModel?`<p class="inspector-note">${esc(town.atlasDesign.churchDemandModel)}</p>`:''}<button class="inspector-button" id="property-history">See world activity <span>→</span></button></div><div class="inspector-section"><p class="inspector-note">Administrator physical truth · live flow and pressure measurements are not provided here. <span id="property-preview-note">Schematic shown while the saved-property preview loads.</span></p></div>`;
+ $('inspector-content').innerHTML=`<div class="inspector-head has-selection"><div style="display:flex;justify-content:space-between;align-items:center"><span class="eyebrow">PROPERTY RECORD</span><button id="close-inspector" aria-label="Clear property selection">×</button></div><div class="property-identity"><div id="selected-property-preview" class="property-preview" title="Schematic fallback while the saved-property preview loads">${propertySchematic(selected)}<span class="schematic-label">SCHEMATIC</span></div><div><h2>${esc(p.address)}</h2><p class="property-character">${esc(selected.buildingType.replaceAll('_',' '))} · ${esc(selected.premiseType)}</p></div></div><div class="property-state"><span class="pill">${p.occupied?'Occupied':'Vacant'}</span><span>${selected.premiseType==='residential'?`${fmt(p.occupants)} ${p.occupants===1?'resident':'residents'}`:'Nonresidential property'}</span></div></div><div class="asset-tabs">${['water','electric','gas'].map(u=>`<button data-asset="${u}" class="${u===utility?'active':''}">${u==='electric'?'Electric':u[0].toUpperCase()+u.slice(1)}</button>`).join('')}</div><div class="inspector-section"><h3>${icon(utility)}${utility==='electric'?'Electricity':utility[0].toUpperCase()+utility.slice(1)} service</h3>${a?`<div class="data-row"><span>Device condition</span><span class="${a.condition==='healthy'?'status-good':'status-warn'}">${esc(a.condition)}</span></div><span class="eyebrow" style="font-size:8px;margin-top:19px">RECORDED DAILY USE</span><div class="reading-value">${fmt(a.observed_quantity)} <small>${unit(a.unit)}</small></div><p class="inspector-note">${day(detail.lastCompletedDay)} · ${esc(a.observed_status||'No observation')}</p>${row('Physical use',`${fmt(a.true_quantity)} ${unit(a.unit)}`)}${row('Meter',esc(a.id))}${row('Installed',esc(a.installed))}`:'<p class="inspector-note">No physical meter is recorded for this service.</p>'}</div><div class="inspector-section"><h3>${icon(selected.premiseType==='residential'?'home':'overview')}Physical property</h3>${row('Occupancy',p.occupied?'Occupied':'Vacant')}${selected.premiseType==='residential'?row('Residents',fmt(p.occupants)):row('Property use',esc(selected.premiseType))}${row('Floor area',`${fmt(p.floorAreaM2)} m²`)}${row('Built',esc(selected.yearBuilt))}${row('Property reference',esc(p.id))}${selected.buildingType==='church'&&town.atlasDesign?.churchDemandModel?`<p class="inspector-note">${esc(town.atlasDesign.churchDemandModel)}</p>`:''}<button class="inspector-button" id="property-history">View reading history <span>→</span></button></div><div class="inspector-section"><p class="inspector-note">Administrator physical truth · live flow and pressure measurements are not provided here. <span id="property-preview-note">Schematic shown while the saved-property preview loads.</span></p></div>`;
  loadPropertyPreview(selected);
 }
 async function loadPropertyPreview(home){
@@ -232,14 +241,14 @@ function bind(){
   const pageButton=e.target.closest('[data-page]');if(pageButton){route(pageButton.dataset.page);return;}
   if(e.target.closest('#map-art-toggle')){map.setBlockArtwork(!map.blockArtStats?.enabled);updateArtStatus();return;}
   if(e.target.closest('.advance-button')){advance();return;}
-  const layer=e.target.closest('[data-layer]');if(layer){map.setLayer(layer.dataset.layer);document.querySelectorAll('[data-layer]').forEach(b=>b.classList.toggle('active',b===layer));$('legend-text').textContent=layer.dataset.layer==='town'?(selected?selected.address+' · selected property':'Select a property to explore'):`${layer.textContent.trim()} network · topology, not live flow`;document.querySelector('.legend-line').style.background={town:'#659785',water:'#149faf',electric:'#e5a735',gas:'#a783d8'}[layer.dataset.layer];renderProperty();return;}
+  const layer=e.target.closest('[data-layer]');if(layer){map.setLayer(layer.dataset.layer);document.querySelectorAll('[data-layer]').forEach(b=>b.classList.toggle('active',b===layer));$('legend-text').textContent=layer.dataset.layer==='town'?(selected?selected.address+' · selected property':'Select a property to explore'):layer.dataset.layer==='zoning'?'Saved zoning plan · select a house for its records':`${layer.textContent.trim()} network · topology, not live flow`;document.querySelector('.legend-line').style.background={town:'#659785',zoning:'#eee985',water:'#149faf',electric:'#e5a735',gas:'#a783d8'}[layer.dataset.layer];renderProperty();return;}
   const asset=e.target.closest('[data-asset]');if(asset){renderProperty(asset.dataset.asset);return;}
   const filterButton=e.target.closest('[data-filter]');if(filterButton){filter=filterButton.dataset.filter;renderActivity();return;}
   const result=e.target.closest('[data-property]');if(result){selectProperty(town.premises.find(p=>p.id===result.dataset.property),true);return;}
   if(e.target.closest('#sample-property')){selectProperty(town.premises.find(p=>p.premiseType==='residential'),true);return;}
   if(e.target.closest('#close-inspector')){++requestVersion;selected=null;detail=null;map.clearSelection();emptyInspector();if(map.layer==='town')$('legend-text').textContent='Select a property to explore';return;}
   if(e.target.closest('#retry-property')&&selected){selectProperty(selected);return;}
-  if(e.target.closest('#property-history')){route('activity');return;}
+  if(e.target.closest('#property-history')){records.showHistory(selected);return;}
  });
  $('explore-mode').onclick=()=>map.setDrawing(false);$('build-mode').onclick=()=>map.setDrawing(true);
  $('fit-map').onclick=()=>map.home();$('zoom-in').onclick=()=>map.zoom(.8);$('zoom-out').onclick=()=>map.zoom(1.25);
@@ -261,6 +270,7 @@ function bind(){
  try{const saved=localStorage.getItem('civic-atlas:input');if(['auto','mouse','trackpad'].includes(saved)){$('input-mode').value=saved;map.inputMode=saved;}}catch{}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&page==='map'&&!dialog.open){$('search-results').hidden=true;map.setDrawing(false);}if(e.key==='/'&&page==='map'&&!e.target.closest('input,textarea,select')&&!dialog.open){e.preventDefault();$('map-search').focus();}});
  window.addEventListener('popstate',()=>route(location.hash.slice(1),true));
+ document.addEventListener('atlas-world-activity',renderActivity);
  window.addEventListener('pagehide',()=>map.destroy(),{once:true});
 }
 async function boot(){
@@ -269,12 +279,18 @@ async function boot(){
   const data=await api('bootstrap');town=data.snapshot;state=data.state;
   $('app').hidden=false;$('welcome-page').hidden=true;$('map-page').hidden=false;
   map=new AtlasMap($('map-canvas'),town,{onSelect:selectProperty,onSketch:sketchChanged,notify:toast,initialView:worldProfile(town,state).initialView,art:new URLSearchParams(location.search).get('art')||worldProfile(town,state).defaultArt});
+  if(town.atlasDesign?.presetId){
+   const button=document.createElement('button');button.dataset.layer='zoning';button.textContent='Zoning';document.querySelector('.layer-tabs').append(button);
+   const legend=document.createElement('div');legend.className='zoning-key';legend.innerHTML=Object.entries({Residential:'#eee985',Commercial:'#ed8183',Industrial:'#7fb0eb',Institutional:'#e6a4d5',Agricultural:'#e7dcc6','Parks & open space':'#bee777',Environmental:'#8da777','Mixed use':'#ac80c6',Development:'#b8bcbd'}).map(([name,color])=>`<span><i style="background:${color}"></i>${name}</span>`).join('');$('map-options').append(legend);
+   const link=document.createElement('a');link.href='/presets/riverbend-500/review.html';link.textContent='Review the master plan';link.className='preset-review-link';$('map-options').append(link);
+  }
   await map.visualReady;
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   mapImage=map.capture();
   emptyInspector();refreshViews();bind();
   $('boot').hidden=true;route(location.hash.slice(1)||'welcome',true);
   const place=new URLSearchParams(location.search).get('place');if(place&&location.hash==='#map')visitPlace(place);
+  const premise=new URLSearchParams(location.search).get('premise');if(premise&&location.hash==='#map'){const home=town.premises.find(p=>p.id===premise);if(home)selectProperty(home,true);}
   document.body.dataset.ready='true';
   // Read-only diagnostics for repeatable browser acceptance checks.
   window.atlasDiagnostics=()=>({townId:town.id,grass:map.grassArt,artwork:{enabled:Boolean(map.blockArtStats?.enabled),count:map.blockArtStats?.count||0,totalBlocks:map.blockArtStats?.totalBlocks,readyCount:map.blockArtStats?.readyCount,fallbackCount:map.blockArtStats?.fallbackCount,textureCount:map.blockArtStats?.textureCount,templates:map.blockArtStats?.templates?.map(t=>({...t}))||[],rejected:map.blockArtStats?.rejected?.map(r=>({...r}))||[],areas:map.blockPlates?.map(p=>({...p.stats}))||[]},selectedId:selected?.id,through:state.through,drawing:map.drawing,draft:map.draft(),camera:map.scene.camera.position.toArray(),target:map.scene.controls.target.toArray(),projection:map.scene.camera.isOrthographicCamera?'orthographic':'perspective',cameraZoom:map.scene.camera.zoom,frustum:map.scene.camera.isOrthographicCamera?[map.scene.camera.left,map.scene.camera.right,map.scene.camera.top,map.scene.camera.bottom]:null,renderer:map.scene.performanceState()});

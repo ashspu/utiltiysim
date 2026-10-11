@@ -1,0 +1,1031 @@
+{
+  "schemaVersion": "civic-atlas-farm-buildings/1",
+  "buildings": [
+    {
+      "id": "farm-northwest-01",
+      "farmstead": "northwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          112.16,
+          43.689
+        ],
+        [
+          91.953,
+          37.915
+        ],
+        [
+          86.292,
+          57.726
+        ],
+        [
+          97.407,
+          60.902
+        ],
+        [
+          100.52,
+          50.006
+        ],
+        [
+          109.613,
+          52.604
+        ],
+        [
+          112.16,
+          43.689
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-northwest-02",
+      "farmstead": "northwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          71.529,
+          38.882
+        ],
+        [
+          67.706,
+          54.176
+        ],
+        [
+          79.941,
+          57.235
+        ],
+        [
+          83.765,
+          41.941
+        ],
+        [
+          71.529,
+          38.882
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-northwest-03",
+      "farmstead": "northwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          74.941,
+          75.235
+        ],
+        [
+          78.0,
+          63.0
+        ],
+        [
+          68.588,
+          60.647
+        ],
+        [
+          65.529,
+          72.882
+        ],
+        [
+          74.941,
+          75.235
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-northwest-04",
+      "farmstead": "northwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          98.518,
+          71.243
+        ],
+        [
+          85.642,
+          65.941
+        ],
+        [
+          80.423,
+          78.615
+        ],
+        [
+          93.299,
+          83.917
+        ],
+        [
+          98.518,
+          71.243
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-northwest-05",
+      "farmstead": "northwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          126.5,
+          99.0
+        ],
+        [
+          131.8,
+          83.1
+        ],
+        [
+          118.0,
+          78.5
+        ],
+        [
+          115.085,
+          87.245
+        ],
+        [
+          121.295,
+          89.315
+        ],
+        [
+          118.91,
+          96.47
+        ],
+        [
+          126.5,
+          99.0
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-orchard-edge-01",
+      "farmstead": "orchard-edge",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          173.726,
+          153.708
+        ],
+        [
+          177.16,
+          141.689
+        ],
+        [
+          167.255,
+          138.858
+        ],
+        [
+          163.821,
+          150.877
+        ],
+        [
+          173.726,
+          153.708
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-orchard-edge-02",
+      "farmstead": "orchard-edge",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          198.229,
+          150.189
+        ],
+        [
+          183.445,
+          146.356
+        ],
+        [
+          180.907,
+          156.143
+        ],
+        [
+          191.996,
+          159.017
+        ],
+        [
+          193.391,
+          153.635
+        ],
+        [
+          197.087,
+          154.593
+        ],
+        [
+          198.229,
+          150.189
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-orchard-edge-03",
+      "farmstead": "orchard-edge",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          188.073,
+          168.422
+        ],
+        [
+          172.385,
+          163.716
+        ],
+        [
+          167.321,
+          180.596
+        ],
+        [
+          183.009,
+          185.303
+        ],
+        [
+          188.073,
+          168.422
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-west-road-01",
+      "farmstead": "west-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          89.654,
+          388.523
+        ],
+        [
+          73.673,
+          387.971
+        ],
+        [
+          73.325,
+          398.063
+        ],
+        [
+          89.306,
+          398.614
+        ],
+        [
+          89.654,
+          388.523
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-west-road-02",
+      "farmstead": "west-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          76.025,
+          405.645
+        ],
+        [
+          57.406,
+          404.315
+        ],
+        [
+          56.066,
+          423.076
+        ],
+        [
+          74.685,
+          424.406
+        ],
+        [
+          76.025,
+          405.645
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-west-road-03",
+      "farmstead": "west-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          89.415,
+          427.677
+        ],
+        [
+          92.123,
+          406.015
+        ],
+        [
+          80.185,
+          404.523
+        ],
+        [
+          77.477,
+          426.185
+        ],
+        [
+          89.415,
+          427.677
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-west-wood-01",
+      "farmstead": "west-wood",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          144.331,
+          615.028
+        ],
+        [
+          146.234,
+          592.186
+        ],
+        [
+          132.414,
+          591.034
+        ],
+        [
+          130.51,
+          613.876
+        ],
+        [
+          144.331,
+          615.028
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-west-wood-02",
+      "farmstead": "west-wood",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          118.5,
+          644.5
+        ],
+        [
+          143.5,
+          644.5
+        ],
+        [
+          143.5,
+          624.5
+        ],
+        [
+          118.5,
+          624.5
+        ],
+        [
+          118.5,
+          644.5
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-southwest-01",
+      "farmstead": "southwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          171.192,
+          739.462
+        ],
+        [
+          182.346,
+          737.231
+        ],
+        [
+          177.077,
+          710.885
+        ],
+        [
+          168.712,
+          712.558
+        ],
+        [
+          170.029,
+          719.144
+        ],
+        [
+          167.24,
+          719.702
+        ],
+        [
+          171.192,
+          739.462
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-southwest-02",
+      "farmstead": "southwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          153.5,
+          727.5
+        ],
+        [
+          153.5,
+          744.5
+        ],
+        [
+          163.5,
+          744.5
+        ],
+        [
+          163.5,
+          727.5
+        ],
+        [
+          153.5,
+          727.5
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-southwest-03",
+      "farmstead": "southwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          186.077,
+          747.885
+        ],
+        [
+          174.538,
+          750.192
+        ],
+        [
+          176.923,
+          762.115
+        ],
+        [
+          188.462,
+          759.808
+        ],
+        [
+          186.077,
+          747.885
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-southwest-04",
+      "farmstead": "southwest",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          156.618,
+          752.029
+        ],
+        [
+          159.724,
+          766.006
+        ],
+        [
+          169.782,
+          763.771
+        ],
+        [
+          166.676,
+          749.794
+        ],
+        [
+          156.618,
+          752.029
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-south-road-01",
+      "farmstead": "south-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          408.6,
+          894.8
+        ],
+        [
+          401.6,
+          908.8
+        ],
+        [
+          411.2,
+          913.6
+        ],
+        [
+          418.2,
+          899.6
+        ],
+        [
+          408.6,
+          894.8
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-south-road-02",
+      "farmstead": "south-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          442.038,
+          900.308
+        ],
+        [
+          439.923,
+          910.885
+        ],
+        [
+          451.077,
+          913.115
+        ],
+        [
+          453.192,
+          902.538
+        ],
+        [
+          442.038,
+          900.308
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-south-road-03",
+      "farmstead": "south-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          417.176,
+          909.294
+        ],
+        [
+          410.882,
+          934.471
+        ],
+        [
+          428.529,
+          938.882
+        ],
+        [
+          431.362,
+          927.553
+        ],
+        [
+          423.421,
+          925.568
+        ],
+        [
+          426.882,
+          911.721
+        ],
+        [
+          417.176,
+          909.294
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-south-road-04",
+      "farmstead": "south-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          401.118,
+          957.529
+        ],
+        [
+          422.294,
+          962.824
+        ],
+        [
+          425.588,
+          949.647
+        ],
+        [
+          404.412,
+          944.353
+        ],
+        [
+          401.118,
+          957.529
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-south-river-01",
+      "farmstead": "south-river",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          821.613,
+          906.896
+        ],
+        [
+          843.67,
+          900.594
+        ],
+        [
+          840.274,
+          888.708
+        ],
+        [
+          818.217,
+          895.009
+        ],
+        [
+          821.613,
+          906.896
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-south-river-02",
+      "farmstead": "south-river",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          855.4,
+          922.7
+        ],
+        [
+          849.5,
+          905.0
+        ],
+        [
+          831.8,
+          910.9
+        ],
+        [
+          835.045,
+          920.635
+        ],
+        [
+          843.01,
+          917.98
+        ],
+        [
+          845.665,
+          925.945
+        ],
+        [
+          855.4,
+          922.7
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-east-road-01",
+      "farmstead": "east-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1355.211,
+          520.021
+        ],
+        [
+          1333.126,
+          531.799
+        ],
+        [
+          1339.687,
+          544.1
+        ],
+        [
+          1347.417,
+          539.978
+        ],
+        [
+          1345.776,
+          536.903
+        ],
+        [
+          1360.131,
+          529.247
+        ],
+        [
+          1355.211,
+          520.021
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-east-road-02",
+      "farmstead": "east-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1360.243,
+          526.459
+        ],
+        [
+          1363.243,
+          544.459
+        ],
+        [
+          1373.297,
+          542.784
+        ],
+        [
+          1370.297,
+          524.784
+        ],
+        [
+          1360.243,
+          526.459
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-east-road-03",
+      "farmstead": "east-road",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1359.8,
+          561.4
+        ],
+        [
+          1357.969,
+          546.754
+        ],
+        [
+          1343.446,
+          548.569
+        ],
+        [
+          1345.277,
+          563.215
+        ],
+        [
+          1359.8,
+          561.4
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-east-fields-01",
+      "farmstead": "east-fields",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1376.811,
+          266.865
+        ],
+        [
+          1380.486,
+          288.919
+        ],
+        [
+          1392.162,
+          286.973
+        ],
+        [
+          1388.486,
+          264.919
+        ],
+        [
+          1376.811,
+          266.865
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-east-fields-02",
+      "farmstead": "east-fields",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1377.8,
+          278.9
+        ],
+        [
+          1373.7,
+          266.6
+        ],
+        [
+          1350.6,
+          274.3
+        ],
+        [
+          1354.7,
+          286.6
+        ],
+        [
+          1377.8,
+          278.9
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-east-fields-03",
+      "farmstead": "east-fields",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1364.005,
+          285.113
+        ],
+        [
+          1353.954,
+          288.979
+        ],
+        [
+          1356.66,
+          296.015
+        ],
+        [
+          1366.711,
+          292.149
+        ],
+        [
+          1364.005,
+          285.113
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    },
+    {
+      "id": "farm-west-pasture-01",
+      "farmstead": "west-pasture",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          190.0,
+          404.0
+        ],
+        [
+          194.0,
+          387.0
+        ],
+        [
+          175.216,
+          382.58
+        ],
+        [
+          173.016,
+          391.93
+        ],
+        [
+          183.347,
+          394.361
+        ],
+        [
+          181.547,
+          402.011
+        ],
+        [
+          190.0,
+          404.0
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "concept roof trace refined to an orthogonal footprint"
+    },
+    {
+      "id": "farm-east-fields-04",
+      "farmstead": "east-fields",
+      "kind": "farm-building",
+      "polygon": [
+        [
+          1385,
+          302
+        ],
+        [
+          1394,
+          300
+        ],
+        [
+          1397,
+          310
+        ],
+        [
+          1388,
+          312
+        ],
+        [
+          1385,
+          302
+        ]
+      ],
+      "heightM": 4.5,
+      "heightSource": "illustrative; not measured or a simulation record",
+      "premiseId": null,
+      "source": "roof boundary traced from approved concept"
+    }
+  ],
+  "status": "Traced farm roof shapes; use and height remain illustrative. No customer identities assigned."
+}
