@@ -1,5 +1,5 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
-import { renderPhysicalSliderForm, configurationFormSchema, upgradePhysicalConfiguration, physicalFields, getPath } from './physical-slider-form.mjs';
+import { renderPhysicalSliderForm, configurationFormSchema, upgradePhysicalConfiguration, physicalFields, getPath, physicalChoiceLabel } from './physical-slider-form.mjs';
 import { initializationProgress, retainCreationResult } from './workspace-start-state.mjs';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
@@ -68,7 +68,7 @@ function review() {
   const source=sourceFor(draft.sourceId),schema=configurationFormSchema(catalog.configuration,draft.configuration);
   const settings=physicalFields(schema).map(({path,schema:field})=>{
     const value=getPath(draft.configuration,path),unit=field['x-control']?.unit??field['x-unit'];
-    const state=field.type==='boolean'?(value?'Enabled':'Disabled'):value;
+    const state=field.type==='boolean'?(value?'Enabled':'Disabled'):field.type==='string'?physicalChoiceLabel(path,field,value):value;
     const groupPath=path.split('.').slice(0,-1);let group=schema;for(const part of groupPath)group=group.properties[part];
     return `<div><dt>${esc(field.title||'Physical setting')}${group.title?`<small>${esc(group.title)}</small>`:''}</dt><dd>${esc(state)}${unit?' '+esc(unit):''}</dd></div>`;
   }).join('');

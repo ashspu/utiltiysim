@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { physicalFields, physicalDefaults, validatePhysicalValues, restorePhysicalPreset, sliderExtent, configurationFormSchema, upgradePhysicalConfiguration } from './web/physical-slider-form.mjs';
+import { physicalFields, physicalDefaults, validatePhysicalValues, restorePhysicalPreset, sliderExtent, configurationFormSchema, upgradePhysicalConfiguration, physicalChoiceLabel } from './web/physical-slider-form.mjs';
 const share = { type: 'number', minimum: 0, maximum: 100, multipleOf: .1 };
 const schema = { type: 'object', properties: {
   meters: { type: 'object', properties: { ami: { ...share, default: 60 }, amr: { ...share, default: 30 }, manual: { ...share, default: 10 }, invented: { type: 'number', default: 7, 'x-supported': false } } },
@@ -78,4 +78,19 @@ test('x-control display limits never constrain exact engine-valid input',()=>{
   assert.equal(sliderExtent(field,.03).max,.2);assert.equal(sliderExtent(field,.72).max,.72);
   assert.equal(sliderExtent(field,.03).step,.001);
   assert.deepEqual(validatePhysicalValues({properties:{rate:field}},{rate:.1234567}),[]);
+});
+test('range never snaps an exact value onto a different presentation step',()=>{
+  const payment={type:'integer',minimum:1,maximum:100000000,'x-control':{step:100}};
+  assert.equal(sliderExtent(payment,50000).step,'any');
+  assert.equal(sliderExtent(payment,50001).step,100);
+  const probability={type:'number',minimum:0,maximum:1,'x-control':{step:.001}};
+  assert.equal(sliderExtent(probability,.0153).step,'any');
+  assert.equal(sliderExtent(probability,.015).step,.001);
+  assert.deepEqual(validatePhysicalValues({properties:{payment}}, {payment:50000}),[]);
+});
+test('cashflow choices use engine labels and server labels take precedence',()=>{
+  assert.equal(physicalChoiceLabel('physical.householdCashflow.insufficientCashPolicy',{},'available-cash'),'Spend available cash; record remainder');
+  assert.equal(physicalChoiceLabel('insufficientCashPolicy',{},'all-or-nothing'),'Spend only if the whole expense is covered');
+  assert.equal(physicalChoiceLabel('insufficientCashPolicy',{'x-control':{optionLabels:{'available-cash':'Server label'}}},'available-cash'),'Server label');
+  assert.equal(physicalChoiceLabel('otherChoice',{},'available-cash'),'available-cash');
 });

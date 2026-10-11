@@ -64,7 +64,7 @@ export function upgradePhysicalConfiguration(saved, defaults) {
   return {...clone(defaults),world:clone(saved.world)};
 }
 export function sliderExtent(field, value) {
-  const step = field['x-control']?.step ?? field['x-step'] ?? field.multipleOf ?? (field.type === 'integer' ? 1 : 'any');
+  let step = field['x-control']?.step ?? field['x-step'] ?? field.multipleOf ?? (field.type === 'integer' ? 1 : 'any');
   // Display extents are distinct from validation bounds. Unbounded server fields
   // keep an exact input; typed values extend the visual slider instead of clipping.
   const center = Number.isFinite(value) ? value : field.default ?? 0;
@@ -74,7 +74,24 @@ export function sliderExtent(field, value) {
   if(field.minimum !== undefined)min = Math.max(min,field.minimum);
   if(field.maximum !== undefined)max = Math.min(max,field.maximum);
   if (max <= min) max = min + 1;
+  // Native range inputs snap to min+n*step. Exact engine-valid values need not
+  // share that presentation grid; prevent the browser displaying a different
+  // value from the saved exact input. Keep coarse steps when already aligned.
+  if(Number.isFinite(step)&&step>0&&Number.isFinite(value)){
+    const position=(value-min)/step;
+    if(Math.abs(position-Math.round(position))>1e-8)step='any';
+  }
   return { min, max, step };
+}
+export function physicalChoiceLabel(path, field, choice) {
+  const supplied=field['x-control']?.optionLabels?.[choice];
+  if(supplied)return supplied;
+  // Existing physical engine labels, utilsim/world/customer_cashflow.html.
+  if(path.split('.').at(-1)==='insufficientCashPolicy')return {
+    'available-cash':'Spend available cash; record remainder',
+    'all-or-nothing':'Spend only if the whole expense is covered',
+  }[choice] || choice;
+  return choice;
 }
 let sequence = 0;
 export function renderPhysicalSliderForm(container, schema, options = {}) {
@@ -108,7 +125,7 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
     slider.setAttribute('aria-describedby', help.id);
     if(field.type==='boolean' || field.type==='string') {
       const input = field.type==='boolean' ? make('input') : make('select');input.id=`${id}-number`;
-      if(field.type==='boolean')input.type='checkbox';else for(const choice of field.enum){const option=make('option',field['x-control']?.optionLabels?.[choice] || choice);option.value=choice;input.append(option);}
+      if(field.type==='boolean')input.type='checkbox';else for(const choice of field.enum){const option=make('option',physicalChoiceLabel(path,field,choice));option.value=choice;input.append(option);}
       input.setAttribute('aria-describedby',`${id}-help ${id}-error`);
       section.classList.add('physical-choice-row');section.append(label,input,marker,help,error);groups.get(groupPath).append(section);
       controls.set(path,{field,exact:input,marker,error});
