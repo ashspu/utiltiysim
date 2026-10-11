@@ -9,29 +9,42 @@ const fail = message => { throw Object.assign(new Error(message), { status: 422 
 function keys(value, expected) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !expected.includes(key))) fail('Unexpected setup fields.');
 }
-export function validateSetup(input) {
+function validateFields(values, schema) {
+  keys(values, Object.keys(schema.properties));
+  const result = {};
+  for (const [field, rule] of Object.entries(schema.properties)) {
+    const value = values[field];
+    if (rule.type === 'object') { result[field] = validateFields(value, rule); continue; }
+    const valid = rule.type === 'boolean' ? typeof value === 'boolean' :
+      rule.type === 'string' ? typeof value === 'string' && (!rule.enum || rule.enum.includes(value)) :
+      ['number','integer'].includes(rule.type) && typeof value === 'number' && Number.isFinite(value) &&
+        (rule.type !== 'integer' || Number.isSafeInteger(value)) &&
+        (rule.minimum === undefined || value >= rule.minimum) && (rule.maximum === undefined || value <= rule.maximum);
+    if (!valid) fail(`Invalid ${(rule.title || field).toLowerCase()}.`);
+    result[field] = value;
+  }
+  return result;
+}
+export function validateSetup(input, setupCatalog = catalog) {
   keys(input, ['id','commandId','revision','name','start','sourceId','sourceRevision','snapshotSha256','configuration']);
   if (!uuid.test(input.id || '') || !uuid.test(input.commandId || '')) fail('A valid setup and save identifier are required.');
   if (!Number.isSafeInteger(input.revision) || input.revision < 0) fail('Invalid setup revision.');
   if (typeof input.name !== 'string' || !input.name.trim() || input.name.trim().length > 120) fail('Enter a setup name of 1–120 characters.');
   if (typeof input.start !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input.start) || !Number.isFinite(Date.parse(input.start)) || new Date(input.start).toISOString().slice(0,10) !== input.start) fail('Enter a valid start date.');
-  const source = catalog.sources.find(source => source.id === input.sourceId && source.canConfigure);
+  const source = setupCatalog.sources.find(source => source.id === input.sourceId && source.canConfigure);
   if (!source || source.snapshotSha256 !== input.snapshotSha256 || source.sourceRevision !== input.sourceRevision) fail('This map revision is not available for setup. Select the current accepted town.');
-  keys(input.configuration, ['world']);
-  keys(input.configuration.world, Object.keys(catalog.configuration.schemas.world.properties));
-  const world = {};
-  for (const [group, schema] of Object.entries(catalog.configuration.schemas.world.properties)) {
-    const values = input.configuration.world[group];
-    keys(values, Object.keys(schema.properties));
-    world[group] = {};
-    for (const [field, rule] of Object.entries(schema.properties)) {
-      const value = values[field];
-      if (typeof value !== 'number' || !Number.isFinite(value) || (rule.minimum !== undefined && value < rule.minimum) || (rule.maximum !== undefined && value > rule.maximum)) fail(`Invalid ${rule.title.toLowerCase()}.`);
-      world[group][field] = value;
-    }
+  const extended = input.configuration && (Object.hasOwn(input.configuration,'physical') || Object.hasOwn(input.configuration,'schemaVersion'));
+  keys(input.configuration, extended ? ['world','physical','schemaVersion'] : ['world']);
+  if (extended && (input.configuration.schemaVersion !== 'physical-setup/2' || setupCatalog.configuration.configurationVersion !== 'physical-setup/2' || !setupCatalog.configuration.schemas.physical)) fail('Select the advertised physical-setup/2 configuration.');
+  const world = validateFields(input.configuration.world, setupCatalog.configuration.schemas.world);
+  const configuration = {world};
+  if (extended) {
+    configuration.schemaVersion = 'physical-setup/2';
+    configuration.physical = validateFields(input.configuration.physical, setupCatalog.configuration.schemas.physical);
+    if (configuration.physical.householdCashflow.enabled && !configuration.physical.householdFinance.enabled) fail('Household cashflow requires household finance profiles.');
   }
   return { id:input.id, commandId:input.commandId, revision:input.revision, name:input.name.trim(), start:input.start,
-    sourceId:source.id, sourceRevision:source.sourceRevision, townId:source.townId, grantTownId:source.grantTownId, snapshotSha256:source.snapshotSha256, configuration:{world} };
+    sourceId:source.id, sourceRevision:source.sourceRevision, townId:source.townId, grantTownId:source.grantTownId, snapshotSha256:source.snapshotSha256, configuration };
 }
 // One owner hash makes revision check + write atomic, without expiring drafts.
 // A lost response can be retried with the same command and identical payload.
