@@ -37,7 +37,8 @@ export function publicConnectedStatus(value, marker) {
       || !publicId.test(marker.runId) || !publicId.test(marker.controllerId)
       || !value || value.schemaVersion !== 'connected-status/1'
       || value.runId !== marker.runId || value.controllerId !== marker.controllerId
-      || !(canonicalDay(value.physicalThrough) || value.physicalThrough === null && value.producerAvailable === false)
+      || !(canonicalDay(value.physicalThrough) || value.physicalThrough === null && Boolean(value.technicalError))
+      || value.physicalThrough === null && value.producerAvailable === true
       || value.producerAvailable !== undefined && typeof value.producerAvailable !== 'boolean'
       || !canonicalInstant(value.clock)
       || !['paused', 'idle', 'running', 'failed'].includes(value.phase)
@@ -62,17 +63,36 @@ export function publicConnectedStatus(value, marker) {
     revision: value.revision, target: value.target ?? null, activeCommandId: value.activeCommandId ?? null,
     technicalError: Boolean(value.technicalError), counts, supportedActions: [...value.supportedActions] };
   if (typeof value.errorJobId === 'string' && /^[A-Za-z0-9_.:-]{1,200}$/.test(value.errorJobId)) result.errorJobId = value.errorJobId;
-  if (value.producerAvailable !== undefined) result.producerAvailable = value.producerAvailable;
+  if (value.physicalThrough === null) {
+    result.producerAvailable = false;
+    result.supportedActions = result.supportedActions.filter(action => action === 'pause');
+  } else if (value.producerAvailable !== undefined) result.producerAvailable = value.producerAvailable;
   if (value.lastCommand != null) {
     const command = value.lastCommand;
-    if (typeof command.commandId !== 'string' || !publicId.test(command.commandId) || !['accepted','completed','failed'].includes(command.status)
+    if (typeof command.commandId !== 'string' || !publicId.test(command.commandId) || !['accepted','completed','failed','interrupted'].includes(command.status)
         || !connectedActions.includes(command.action) || !Number.isSafeInteger(command.acceptedRevision)
         || command.acceptedRevision < 1 || command.acceptedRevision > value.revision
         || (command.action === 'advance' ? !canonicalInstant(command.target) : command.target != null)) {
       fail(502, 'The controller returned invalid command progress.');
     }
+    const interrupted = command.status === 'interrupted';
+    const outcome = command.outcome;
+    if (interrupted && (command.action !== 'advance' || outcome !== 'interrupted' || command.targetReached !== false)
+        || outcome !== undefined && !['interrupted','target-reached'].includes(outcome)
+        || outcome === 'interrupted' && !interrupted
+        || outcome === 'target-reached' && (command.status !== 'completed' || command.action !== 'advance'
+          || command.targetReached !== true || command.achievedClock !== command.target || command.achievedClock > value.clock)
+        || outcome === undefined && (command.targetReached !== undefined || command.achievedClock !== undefined)
+        || interrupted && command.achievedClock !== undefined) {
+      fail(502, 'The controller returned invalid command outcome.');
+    }
     result.lastCommand = {commandId: command.commandId, status: command.status, action: command.action,
       target: command.target ?? null, acceptedRevision: command.acceptedRevision};
+    if (outcome !== undefined) {
+      result.lastCommand.outcome = outcome;
+      result.lastCommand.targetReached = command.targetReached;
+      if (command.achievedClock !== undefined) result.lastCommand.achievedClock = command.achievedClock;
+    }
   }
   return result;
 }

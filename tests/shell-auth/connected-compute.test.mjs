@@ -34,10 +34,27 @@ test('actual UTC targets and matching command execution are projected without pr
   const result=await call({reply});assert.equal(result.status,200);assert.equal(result.data.clock,progress.clock);assert.equal(result.data.target,lastCommand.target);assert.equal(result.data.technicalError,true);assert.equal(result.data.counts.unmappedInvoices,2);assert.equal(result.data.lastCommand.status,'failed');assert.ok(!JSON.stringify(result.data).includes('private'));
   for(const invalid of [{...reply,clock:'2026-02-30T00:00:00Z'},{...reply,target:'2026-01-02'},{...reply,lastCommand:{...lastCommand,acceptedRevision:4}},{...reply,lastCommand:{...lastCommand,action:'start'}}])assert.equal((await call({reply:invalid})).status,502);
 });
-test('an explicit producer outage preserves the local clock without inventing a physical cursor',async()=>{
-  const reply={...progress,physicalThrough:null,producerAvailable:false,technicalError:'private connection failure',supportedActions:['pause']};
+test('actual VS outage preserves local clock and pause without requiring a separate availability flag',async()=>{
+  const reply={...progress,physicalThrough:null,technicalError:'private connection failure',supportedActions:['pause','resume','advance']};
   const result=await call({reply});assert.equal(result.status,200);assert.equal(result.data.physicalThrough,null);assert.equal(result.data.producerAvailable,false);assert.deepEqual(result.data.supportedActions,['pause']);assert.equal(result.data.technicalError,true);
-  for(const invalid of [{...reply,producerAvailable:true},{...reply,producerAvailable:undefined},{...reply,producerAvailable:'false'}])assert.equal((await call({reply:invalid})).status,502);
+  assert.ok(!JSON.stringify(result.data).includes('private'));
+  for(const invalid of [{...reply,technicalError:null},{...reply,technicalError:false},{...reply,producerAvailable:'false'}])assert.equal((await call({reply:invalid})).status,502);
+});
+test('interrupted and proved target outcomes are explicit while legacy completion remains readable',async()=>{
+  const base={commandId,action:'advance',target:'2026-01-02T06:00:00Z',acceptedRevision:3};
+  const interrupted={...base,status:'interrupted',outcome:'interrupted',targetReached:false};
+  const result=await call({reply:{...progress,lastCommand:interrupted}});
+  assert.equal(result.status,200);assert.deepEqual(result.data.lastCommand,interrupted);
+  const reached={...base,status:'completed',outcome:'target-reached',targetReached:true,achievedClock:base.target};
+  assert.deepEqual((await call({reply:{...progress,clock:base.target,lastCommand:reached}})).data.lastCommand,reached);
+  assert.equal((await call({reply:{...progress,lastCommand:reached}})).status,502);
+  assert.equal((await call({reply:{...progress,lastCommand:{...base,status:'completed'}}})).status,200);
+  for(const invalid of [{...interrupted,targetReached:true},{...interrupted,action:'pause',target:null},
+    {...interrupted,achievedClock:progress.clock},{...interrupted,outcome:undefined},
+    {...reached,achievedClock:progress.clock},{...reached,targetReached:false},
+    {...reached,status:'accepted'},{...base,status:'completed',targetReached:true}]){
+    assert.equal((await call({reply:{...progress,lastCommand:invalid}})).status,502);
+  }
 });
 test('current verified view grant can read but cannot control',async()=>{
   assert.equal((await call({role:'analyst'})).status,200);

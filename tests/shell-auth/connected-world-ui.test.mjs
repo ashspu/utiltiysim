@@ -93,11 +93,35 @@ test('only explicit controller nonacceptance releases exact identity and require
 test('producer outage shows no physical cursor, blocks advance and retains advertised pause',async()=>{
   const h=await harness();
   try {
-    Object.assign(h.reports.get(identity),{physicalThrough:null,producerAvailable:false,supportedActions:['pause','advance']});
+    Object.assign(h.reports.get(identity),{physicalThrough:null,producerAvailable:false,supportedActions:['pause','resume','advance']});
     await h.button('Refresh reported status').click();
-    assert.equal(h.nodes.get('controls').disabled,true);assert.equal(h.button('Advance connected day').disabled,true);assert.equal(h.button('Pause').disabled,false);
+    assert.equal(h.nodes.get('controls').disabled,true);assert.equal(h.button('Advance connected day').disabled,true);assert.equal(h.button('Resume').disabled,true);assert.equal(h.button('Pause').disabled,false);
     const definitions=h.nodes.get('connected-panel').all(node=>node.tag==='dl')[0].children;
     const physical=definitions.findIndex(node=>node.textContent==='Next physical UTC day');assert.equal(definitions[physical+1].textContent,'Unavailable');
     await h.button('Pause').click();assert.equal(h.requests.filter(item=>item.body?.action==='pause').length,1);
   } finally { h.close(); }
+});
+test('page distinguishes interrupted advance from an explicitly proved reached target',async()=>{
+  const h=await harness();
+  try{
+    await h.nodes.get('day').click();
+    const command=h.requests.find(item=>item.body?.action==='advance').body;
+    const reported=h.reports.get(identity);
+    reported.lastCommand={commandId:command.commandId,status:'interrupted',action:'advance',
+      target:command.through,acceptedRevision:1,outcome:'interrupted',targetReached:false};
+    reported.revision=1;
+    await h.button('Refresh reported status').click();
+    let text=h.nodes.get('connected-panel').all(node=>node.tag==='p').map(node=>node.textContent).join(' ');
+    assert.match(text,/Advance interrupted; requested 2026-01-02T00:00:00Z. Current clock 2026-01-01T00:00:00Z/);
+    assert.doesNotMatch(text,/Advance reached/);
+    Object.assign(reported.lastCommand,{status:'completed',outcome:'target-reached',targetReached:true,achievedClock:command.through});
+    reported.clock=command.through;
+    await h.button('Refresh reported status').click();
+    text=h.nodes.get('connected-panel').all(node=>node.tag==='p').map(node=>node.textContent).join(' ');
+    assert.match(text,/Advance reached 2026-01-02T00:00:00Z/);
+    delete reported.lastCommand.outcome;delete reported.lastCommand.targetReached;delete reported.lastCommand.achievedClock;
+    await h.button('Refresh reported status').click();
+    text=h.nodes.get('connected-panel').all(node=>node.tag==='p').map(node=>node.textContent).join(' ');
+    assert.doesNotMatch(text,/Advance reached/);assert.match(text,/Check the reported clock for progress/);
+  }finally{h.close();}
 });
