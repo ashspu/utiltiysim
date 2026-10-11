@@ -1,9 +1,15 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
 import { renderPhysicalSliderForm, configurationFormSchema, upgradePhysicalConfiguration, physicalFields, getPath, physicalChoiceLabel } from './physical-slider-form.mjs';
 import { initializationProgress, retainCreationResult, completedStartMatches } from './workspace-start-state.mjs';
+import { readLifecycle, retainLifecycle, settleLifecycle, dismissRejectedLifecycle, deletionBlocked } from './workspace-library-state.mjs';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
+let lifecycleBusy=false;
+const librarySetups=new Map();
 const isOwner = () => session.grants.some(g => g.role === 'owner');
+const ownsSetup = setup => session.grants.some(g=>g.role==='owner'&&(g.town==='*'||g.town===setup.grantTownId));
+const libraryLocked = () => lifecycleBusy || Boolean(readLifecycle(localStorage,session.user.id));
+function lockLibraryControls(){root.querySelectorAll('#workspace-back,#active-setups,#deleted-setups,[data-lifecycle],[data-start-setup],[data-open-setup],[data-lifecycle-retry]').forEach(button=>{button.disabled=true;});}
 const worldLink = id => /^[0-9a-f]{32}$/.test(id || '') ? `/world-control.html?id=${id}` : null;
 const startKey = setup => `utilitysim:start:${session.user.id}:${setup.id}`;
 function readStart(setup) {
@@ -30,6 +36,16 @@ const markDirty = () => { dirty = true; saveCommand = null; };
 const mayLeave = () => !dirty || confirm('Leave this unsaved setup? Your last online save will be kept.');
 window.addEventListener('beforeunload',event => { if(dirty) { event.preventDefault();event.returnValue=''; } });
 document.getElementById('sign-out').onclick = () => { if(mayLeave()) { dirty=false;signOut().catch(()=>message('Could not log out. Please try again.')); } };
+function initializeSettings() {
+  const dialog=document.getElementById('connection-settings');
+  document.getElementById('workspace-settings').onclick=()=>{
+    document.getElementById('compute-settings-link').hidden=!isOwner();
+    document.getElementById('compute-settings-note').hidden=isOwner();
+    dialog.showModal();
+  };
+  document.getElementById('close-settings').onclick=()=>dialog.close();
+  document.getElementById('open-billing-handoff').onclick=()=>{if(mayLeave()){dialog.close();void openLibrary();}};
+}
 function home() {
   if (!mayLeave()) return;
   dirty=false; draft=null; selected=null;
@@ -84,23 +100,64 @@ function review() {
     catch(error){feedback.textContent=error.message;button.disabled=false;}
   };
 }
-async function openLibrary() {
+async function openLibrary(view='active') {
+  if(lifecycleBusy)return;
+  if(view!=='trash')view='active';
   if(!mayLeave())return;
   dirty=false;
-  root.innerHTML=`${backButton()}<p class="eyebrow">YOUR LIBRARY</p><h1>Pick up where you left off.</h1><h2>Saved setups</h2><p class="workspace-note">Starting conditions saved to your account. Starting a simulation pins these values; its initial settings cannot be edited afterward.</p><div id="saved-setups" class="saved-setups" role="status">Loading saved setups…</div><section class="runtime-note"><h2>Existing simulations</h2>${isOwner()?'<p><a href="/compute-connection.html">Manage compute connection →</a></p>':''}<div id="runtime-library" role="status">Loading your simulation worlds…</div><p class="workspace-note">Existing offline simulations and their history remain in the offline app.</p></section>`;
+  root.innerHTML=`${backButton()}<p class="eyebrow">YOUR LIBRARY</p><h1>Pick up where you left off.</h1><div class="library-heading"><h2>${view==='trash'?'Deleted setups':'Saved setups'}</h2><div class="library-tabs" role="group" aria-label="Saved setup view"><button id="active-setups" aria-pressed="${view==='active'}">Saved setups</button><button id="deleted-setups" aria-pressed="${view==='trash'}">Trash</button></div></div><p class="workspace-note">${view==='trash'?'Deleted setups remain recoverable here. Restoring preserves their original map and starting conditions.':'Starting conditions saved to your account. Delete moves a setup to Trash; existing simulation worlds keep their history.'}</p><div id="library-action-status" role="status"></div><div id="saved-setups" class="saved-setups" role="status">Loading saved setups…</div><section class="runtime-note"><h2>Existing simulations</h2><div id="runtime-library" role="status">Loading your simulation worlds…</div><p class="workspace-note">Existing offline simulations and their history remain in the offline app. Manage compute and the billing handoff through Settings.</p></section>`;
   root.querySelector('#workspace-back').onclick=home;
+  root.querySelector('#active-setups').onclick=()=>openLibrary('active');root.querySelector('#deleted-setups').onclick=()=>openLibrary('trash');
+  const actionStatus=root.querySelector('#library-action-status');
+  let pendingAction;
+  try{pendingAction=readLifecycle(localStorage,session.user.id);if(pendingAction){actionStatus.textContent='A previous library action has not been confirmed. Recover it before starting, editing or deleting setups. Retry reuses its exact request.';const retry=document.createElement('button');retry.dataset.lifecycleRetry='';retry.textContent='Retry original '+(pendingAction.action==='delete'?'delete':'restore');retry.onclick=()=>runLifecycle(pendingAction,actionStatus,view);actionStatus.append(retry);}}
+  catch(error){actionStatus.textContent=error.message;pendingAction=true;}
   const list=root.querySelector('#saved-setups');
   const runtime=root.querySelector('#runtime-library');
   void loadWorlds(runtime);
-  try{const {setups}=await api('/api/setups');if(!list.isConnected)return;list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><span class="eyebrow">SAVED STARTING CONDITIONS</span><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>Saved ${esc(new Date(s.updatedAt).toLocaleString())}</small><div class="saved-setup-actions"><button data-open-setup="${esc(s.id)}">Review setup →</button>${canStart(s)?`<button class="primary" data-start-setup="${esc(s.id)}">Start simulation</button>`:''}</div><p class="start-feedback" role="status"></p></article>`).join(''):'<p>No online setups saved yet. Create a world to choose its starting conditions.</p>';list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||!source.canConfigure||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an unavailable map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});
+  try{const {setups}=await api('/api/setups'+(view==='trash'?'?view=trash':''));if(!list.isConnected)return;librarySetups.clear();setups.forEach(setup=>librarySetups.set(setup.id,setup));list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><div class="saved-card-heading"><span class="eyebrow">${view==='trash'?'DELETED SETUP':'SAVED STARTING CONDITIONS'}</span>${ownsSetup(s)?`<button class="delete-setup" data-lifecycle="${esc(s.id)}" aria-label="${view==='trash'?'Restore':'Move to Trash'} ${esc(s.name)}" ${pendingAction?'disabled':''}>${view==='trash'?'↶ Restore':'⌫ Move to Trash'}</button>`:''}</div><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>${view==='trash'?'Deleted':'Saved'} ${esc(new Date(s.deletedAt||s.updatedAt).toLocaleString())}</small>${view==='active'?`<div class="saved-setup-actions"><button data-open-setup="${esc(s.id)}" ${pendingAction?'disabled':''}>Review setup →</button>${canStart(s)?`<button class="primary" data-start-setup="${esc(s.id)}" ${pendingAction?'disabled':''}>Start simulation</button>`:''}</div>`:''}<p class="start-feedback" role="status"></p></article>`).join(''):`<p>${view==='trash'?'Trash is empty.':'No online setups saved yet. Create a world to choose its starting conditions.'}</p>`;list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{try{if(libraryLocked())return;}catch(error){message(error.message);return;}const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||!source.canConfigure||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an unavailable map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});
+    list.querySelectorAll('[data-lifecycle]').forEach(button=>{
+      const setup=setups.find(s=>s.id===button.dataset.lifecycle),feedback=button.closest('article').querySelector('.start-feedback');
+      if(view==='active')try{if(deletionBlocked(readStart(setup))){button.disabled=true;button.title='Recover the original simulation start before deleting this setup.';}}
+      catch(error){button.disabled=true;button.title=error.message;}
+      button.onclick=()=>runLifecycle({action:view==='trash'?'restore':'delete',id:setup.id,revision:setup.revision,commandId:crypto.randomUUID()},feedback,view);
+    });
     list.querySelectorAll('[data-start-setup]').forEach(button=>{
-      const setup=setups.find(s=>s.id===button.dataset.startSetup),feedback=button.closest('article').querySelector('.start-feedback');
+      const setup=setups.find(s=>s.id===button.dataset.startSetup),feedback=button.closest('article').querySelector('.start-feedback');if(pendingAction){button.disabled=true;return;}
       try { const pending=readStart(setup); if(completedStartMatches(pending,setup)){showStarted(button,feedback,pending.worldId);return;} if(pending?.worldId){showStartChoice(setup,button,feedback,pending);}else if(pending){button.textContent=pending.pendingWorldId?'Continue setup':'Retry original start';feedback.textContent=pending.pendingWorldId?`This physical world is still initializing. ${initializationProgress(pending)} Continue runs the next bounded setup batch with the original saved conditions.`:'A previous start has not been confirmed. Retry uses its original saved conditions.';} }
       catch(error){button.disabled=true;feedback.textContent=error.message;return;}
       button.onclick=()=>startSetup(setup,button,feedback,runtime);
     });
   }
-  catch(error){list.textContent=error.message;const retry=document.createElement('button');retry.textContent='Retry saved setups';retry.onclick=openLibrary;list.append(retry);}
+  catch(error){list.textContent=error.message;const retry=document.createElement('button');retry.textContent='Retry saved setups';retry.onclick=()=>openLibrary(view);list.append(retry);}
+}
+async function runLifecycle(command,feedback,view) {
+  if(lifecycleBusy)return;
+  const setup=librarySetups.get(command.id);
+  if(setup&&!ownsSetup(setup)){feedback.textContent='Owner access to this town is required.';return;}
+  if(command.action==='delete'&&setup)try{if(deletionBlocked(readStart(setup))){feedback.textContent='Recover the original simulation start before moving this setup to Trash.';return;}}catch(error){feedback.textContent=error.message;return;}
+  lifecycleBusy=true;
+  feedback.textContent=command.action==='delete'?'Moving setup to Trash…':'Restoring setup…';
+  lockLibraryControls();
+  let retained=false,settled=false;
+  try{
+    retainLifecycle(localStorage,session.user.id,command);
+    retained=true;
+    const result=await api('/api/setups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(command)});
+    settleLifecycle(localStorage,session.user.id,command,result);
+    settled=true;
+    message('Library action confirmed. Refreshing the current saved records.');
+  }catch(error){
+    feedback.textContent=error.message+(retained?' The original library action is retained for recovery.':' No library request was sent because it could not be retained.');
+    const retry=document.createElement('button');retry.dataset.lifecycleRetry='';retry.textContent='Retry original action';retry.onclick=()=>runLifecycle(command,feedback,view);feedback.append(retry);
+    if(retained&&[409,422].includes(error.status)){
+      const reload=document.createElement('button');reload.dataset.lifecycleRetry='';reload.textContent='Dismiss rejected action and reload';reload.onclick=async()=>{if(lifecycleBusy)return;try{dismissRejectedLifecycle(localStorage,session.user.id,command,error.status);await openLibrary(view);}catch(problem){feedback.textContent=problem.message;}};feedback.append(reload);
+    }
+  }finally{
+    lifecycleBusy=false;
+    root.querySelectorAll('#workspace-back,#active-setups,#deleted-setups,[data-lifecycle-retry]').forEach(button=>{button.disabled=false;});
+  }
+  if(settled)await openLibrary(view);
 }
 function showStarted(button,feedback,id) {
   const href=worldLink(id);
@@ -116,7 +173,9 @@ function showStartChoice(setup,button,feedback,record){
 }
 async function startSetup(setup,button,feedback,runtime) {
   if(!canStart(setup))return;
+  try{if(libraryLocked()){feedback.textContent='Recover the pending library action before starting a simulation.';return;}}catch(error){feedback.textContent=error.message;return;}
   button.disabled=true;feedback.textContent='Starting your simulation…';
+  const deleteButton=button.closest?.('article')?.querySelector('[data-lifecycle]');if(deleteButton)deleteButton.disabled=true;
   try {
     let record=readStart(setup);
     if(completedStartMatches(record,setup)){showStarted(button,feedback,record.worldId);return;}
@@ -132,7 +191,7 @@ async function startSetup(setup,button,feedback,runtime) {
       if(runtime.isConnected)void loadWorlds(runtime);
       return;
     }
-    showStartChoice(setup,button,feedback,record);
+    showStartChoice(setup,button,feedback,record);if(deleteButton)deleteButton.disabled=false;
     if(runtime.isConnected)void loadWorlds(runtime);
   }catch(error){feedback.textContent=`${error.message} The original start request is retained; retry it to recover the same simulation.`;button.disabled=false;button.textContent='Retry original start';}
 }
@@ -147,7 +206,7 @@ async function loadWorlds(container,offset=0) {
   }catch(error){if(!container.isConnected)return;container.textContent=error.status===503?`Online compute is disconnected or unavailable. ${error.message}`:`Simulation library could not be loaded. ${error.message}`;const retry=document.createElement('button');retry.textContent='Retry simulation library';retry.onclick=()=>loadWorlds(container,offset);container.append(retry);}
 }
 async function start(){
-  try{session=await readSession();if(!session.authenticated){location.replace(loginUrl('/workspace.html'));return;}if(!session.grants.length){message('Your account is awaiting workspace access from an administrator.');return;}catalog=await api('/api/setups?view=catalog');message(`Welcome, ${session.user.name||session.user.email}.`);home();}
+  try{session=await readSession();if(!session.authenticated){location.replace(loginUrl('/workspace.html'));return;}if(!session.grants.length){message('Your account is awaiting workspace access from an administrator.');return;}catalog=await api('/api/setups?view=catalog');initializeSettings();message(`Welcome, ${session.user.name||session.user.email}.`);home();}
   catch(error){message(error.message);}
 }
 start();

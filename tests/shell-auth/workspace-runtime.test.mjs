@@ -13,6 +13,7 @@ function harness() {
   const ctx={console,crypto:{randomUUID},structuredClone,URL,URLSearchParams,Date,JSON,
     esc:String,initializationProgress,retainCreationResult,completedStartMatches,status:element(),root:element(),window:{addEventListener(){}},
     document:{getElementById:element,createElement:element},
+    localStorage:{getItem:()=>null},readLifecycle:()=>null,
     sessionStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},
     fetch:async(url,options)=>{requests.push({url,options});const response=queue.shift();if(response instanceof Error)throw response;return {ok:response.status===200,status:response.status,json:async()=>response.data};}};
   vm.createContext(ctx);
