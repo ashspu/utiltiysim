@@ -181,7 +181,7 @@ def producer_snapshot(cfg, destination, root="/data"):
     return {"producerBackup": True}
 
 
-def producer_binding(cfg, root, proof, original_root="/data"):
+def producer_identity(cfg, root, original_root="/data"):
     # Read existing identity facts only; the business stores are never rewritten.
     owners = cfg["ownerFiles"]
     with readonly(Path(root) / owners["catalog"]["path"]) as db:
@@ -190,23 +190,37 @@ def producer_binding(cfg, root, proof, original_root="/data"):
         world = db.execute("SELECT path,fingerprint FROM worlds WHERE id=?", (cfg["ownerCli"]["worldId"],)).fetchone()
     require(row and world and row["active"] == 1 and row["environment"] == cfg["runId"]
             and row["controller"] == cfg["ownerCli"]["controllerId"]
-            and row["fingerprint"] == world["fingerprint"] == proof["worldFingerprint"]
+            and row["fingerprint"] == world["fingerprint"]
             and world["path"] == os.path.normcase(str(Path(original_root) / owners["world"]["path"])), "Producer catalog/machine binding differs from VS.")
     with readonly(Path(root) / owners["world"]["path"]) as db:
         meta = {row["key"]: json.loads(row["value"]) for row in db.execute("SELECT key,value FROM meta WHERE key IN ('environment','fingerprint','through')")}
         pending = db.execute("SELECT COUNT(*) FROM machine_days WHERE result IS NULL").fetchone()[0]
-    require(meta.get("environment") == cfg["runId"] and meta.get("fingerprint") == proof["worldFingerprint"]
-            and isinstance(meta.get("through"), str) and meta["through"] <= proof["clock"][:10],
+    require(meta.get("environment") == cfg["runId"] and meta.get("fingerprint") == row["fingerprint"]
+            and isinstance(meta.get("through"), str), "Producer world identity differs from its catalog.")
+    return {"worldFingerprint": row["fingerprint"], "physicalThrough": meta["through"], "pendingMachineCommands": pending}
+
+
+def producer_health(cfg, root="/data", port=8080):
+    response = request(port, "/hosted/health", os.environ["UTILITYSIM_RUNTIME_TOKEN"])
+    require(response.get("status") == "ready" and response.get("machineConfigured") is True,
+            "Actual producer database/machine readiness failed.")
+    producer_identity(cfg, root, original_root=root)
+    return {"ready": True, "runId": cfg["runId"]}
+
+
+def producer_binding(cfg, root, proof, original_root="/data"):
+    state = producer_identity(cfg, root, original_root)
+    require(state["worldFingerprint"] == proof["worldFingerprint"] and state["physicalThrough"] <= proof["clock"][:10],
             "Producer identity/clock differs at shutdown.")
     # A committed world day with a lost reply may retain an unfinished machine
     # command. Preserve it in the full snapshot for exact original-ID retry;
     # complete means complete owner coverage, never that all jobs succeeded.
-    return {"physicalThrough": meta["through"], "pendingMachineCommands": pending}
+    return {name: state[name] for name in ("physicalThrough", "pendingMachineCommands")}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["serve", "health", "pause", "controller-snapshot", "producer-snapshot"])
+    parser.add_argument("action", choices=["serve", "health", "producer-health", "pause", "controller-snapshot", "producer-snapshot"])
     parser.add_argument("--config", default="/config/deployment.json")
     args = parser.parse_args()
     cfg = validate_config(read_json(args.config))
@@ -216,6 +230,8 @@ def main():
         return
     if args.action == "health":
         result = health(cfg)
+    elif args.action == "producer-health":
+        result = producer_health(cfg)
     elif args.action == "pause":
         result = pause(cfg)
     elif args.action == "controller-snapshot":

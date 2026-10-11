@@ -13,6 +13,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
+import accept_owner_interfaces
 import owners
 import recovery
 import stack
@@ -177,6 +178,46 @@ class ArchiveTests(unittest.TestCase):
 
 
 class OwnerInterfaceTests(unittest.TestCase):
+    def test_disposable_restore_checks_all_targets_before_any_move(self):
+        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as foreign:
+            base = Path(temporary).resolve()
+            source, original = base / "snapshot", base / "original"
+            source.mkdir()
+            original.mkdir()
+            (original / "saved").write_text("original")
+            for originals in ([original, Path(foreign)], [original, original], [base]):
+                sources = [source] * len(originals)
+                with self.assertRaises(stack.Refused):
+                    accept_owner_interfaces.restore_disposable(base, sources, originals)
+                self.assertEqual((original / "saved").read_text(), "original")
+                self.assertFalse((base / "retained-originals").exists())
+
+    def test_disposable_restore_retains_original_and_restores_verified_tree(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary).resolve()
+            source, original = base / "snapshot", base / "original"
+            source.mkdir()
+            original.mkdir()
+            (original / "saved").write_text("before")
+            (source / "saved").write_text("checkpoint")
+            accept_owner_interfaces.restore_disposable(base, [source], [original])
+            self.assertEqual((original / "saved").read_text(), "checkpoint")
+            self.assertEqual((base / "retained-originals/0/saved").read_text(), "before")
+
+    def test_producer_health_refuses_missing_machine_and_bad_identity(self):
+        cfg = self.config()
+        with patch.dict(os.environ, {"UTILITYSIM_RUNTIME_TOKEN": "private-gateway"}), \
+                patch.object(owners, "request", return_value={"status": "ready", "machineConfigured": False}), \
+                patch.object(owners, "producer_identity") as identity:
+            with self.assertRaises(stack.Refused):
+                owners.producer_health(cfg)
+            identity.assert_not_called()
+        with patch.dict(os.environ, {"UTILITYSIM_RUNTIME_TOKEN": "private-gateway"}), \
+                patch.object(owners, "request", return_value={"status": "ready", "machineConfigured": True}), \
+                patch.object(owners, "producer_identity", side_effect=stack.Refused("wrong binding")):
+            with self.assertRaises(stack.Refused):
+                owners.producer_health(cfg)
+
     def config(self):
         cfg = fixture()
         cfg["recoveryMode"] = "owner-cli-stopped/1"
