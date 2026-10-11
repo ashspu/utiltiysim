@@ -9,9 +9,9 @@ from shapely.strtree import STRtree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from quality import geometry_checks, quality_report  # noqa: E402
-from server import prepare_world  # noqa: E402
 from town500_world import build_town500_snapshot  # noqa: E402
 
+from server import prepare_world  # noqa: E402
 from utilsim.world.map_view import WorldMap  # noqa: E402
 from utilsim.world.store import World  # noqa: E402
 

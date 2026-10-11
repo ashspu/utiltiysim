@@ -56,9 +56,9 @@ def test_actual_recipient_invoice_and_independent_ledger(tmp_path):
 
 @pytest.mark.skipif(not configured(), reason="Requires the real private VS recipients")
 def test_http_billing_field_world_next_read_roundtrip(tmp_path):
-    import server
     from fastapi.testclient import TestClient
 
+    import server
     from utilsim.world import water_faults
 
     snapshot = build_snapshot(generate(load_preset("village", houses=20, seed="VS-HTTP")), embed_state=False)

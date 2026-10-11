@@ -11,8 +11,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from preset_world import ROOT, build_preset_snapshot  # noqa: E402
 from quality import geometry_checks, quality_report  # noqa: E402
-from server import prepare_world  # noqa: E402
 
+from server import prepare_world  # noqa: E402
 from utilsim.world.map_view import WorldMap  # noqa: E402
 
 
