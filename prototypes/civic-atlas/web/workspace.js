@@ -38,13 +38,15 @@ window.addEventListener('beforeunload',event => { if(dirty) { event.preventDefau
 document.getElementById('sign-out').onclick = () => { if(mayLeave()) { dirty=false;signOut().catch(()=>message('Could not log out. Please try again.')); } };
 function initializeSettings() {
   const dialog=document.getElementById('connection-settings');
-  document.getElementById('workspace-settings').onclick=()=>{
+  const openSettings=()=>{
     document.getElementById('compute-settings-link').hidden=!isOwner();
     document.getElementById('compute-settings-note').hidden=isOwner();
     dialog.showModal();
   };
+  document.getElementById('workspace-settings').onclick=openSettings;
   document.getElementById('close-settings').onclick=()=>dialog.close();
   document.getElementById('open-billing-handoff').onclick=()=>{if(mayLeave()){dialog.close();void openLibrary();}};
+  return openSettings;
 }
 function home() {
   if (!mayLeave()) return;
@@ -210,7 +212,7 @@ async function loadWorlds(container,offset=0) {
   }catch(error){if(!container.isConnected)return;container.textContent=error.status===503?`Online compute is disconnected or unavailable. ${error.message}`:`Simulation library could not be loaded. ${error.message}`;const retry=document.createElement('button');retry.textContent='Retry simulation library';retry.onclick=()=>loadWorlds(container,offset);container.append(retry);}
 }
 async function start(){
-  try{session=await readSession();if(!session.authenticated){location.replace(loginUrl('/workspace.html'));return;}if(!session.grants.length){message('Your account is awaiting workspace access from an administrator.');return;}catalog=await api('/api/setups?view=catalog');initializeSettings();message(`Welcome, ${session.user.name||session.user.email}.`);home();}
+  try{session=await readSession();if(!session.authenticated){location.replace(loginUrl('/workspace.html'));return;}if(!session.grants.length){message('Your account is awaiting workspace access from an administrator.');return;}catalog=await api('/api/setups?view=catalog');const openSettings=initializeSettings();message(`Welcome, ${session.user.name||session.user.email}.`);home();if(new URLSearchParams(location.search).get('settings')==='connections')openSettings();}
   catch(error){message(error.message);}
 }
 start();
