@@ -89,8 +89,8 @@ def drill(utilsim, virtual_systems):
     from receivables.store import Subledger
     from synth_runtime import Run
     from test_hosted_worlds import TOKEN, headers, setup
-    from utilsim.hosted.health import probe
 
+    from utilsim.hosted.health import probe
     from utilsim.hosted.server import create_app
 
     with tempfile.TemporaryDirectory(prefix="owner-api-drill-") as temporary:
