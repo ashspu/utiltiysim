@@ -1,0 +1,51 @@
+{
+  "scope": "Captured physical observations and public producer contracts only; no administrative truth, tokens, sessions, private VS code or production data.",
+  "configurationVersion": "physical-setup/4",
+  "observationVersion": "utility-observations/2.0",
+  "producerRevision": "44e5af22df6e552773a4554c912bd05e0b764c9b",
+  "contractsCapturedFrom": "shell checkout; exact copied bytes recorded in checksums.json",
+  "referenceRevision": "6cfd056",
+  "publicReferenceBase": "https://github.com/gragedmonds/utiltiysim/blob/6cfd056/",
+  "publicReferences": [
+    "schemas/utility-observations-2.0.schema.json",
+    "schemas/customer-contact-intent-1.schema.json",
+    "schemas/financial-contact-intent-1.schema.json",
+    "schemas/payment-intent-1.schema.json",
+    "schemas/customer-finance-delivery-1.schema.json",
+    "schemas/customer-finance-provider-receipt-1.schema.json",
+    "schemas/customer-finance-provider-receipt-2.schema.json",
+    "schemas/field-world-report-1.schema.json",
+    "docs/COMPUTE_CONNECTOR_CONTRACT.md",
+    "deploy/hosted-runtime/CONTRACT.md",
+    "deploy/hosted-runtime/HOSTING.md",
+    "deploy/hosted-runtime/Dockerfile",
+    "utilsim/world/exchange.py",
+    "utilsim/world/delivery.py",
+    "utilsim/world/runtime.py",
+    "utilsim/world/contacts.py",
+    "utilsim/world/customer_finance.py",
+    "utilsim/world/customer_notices.py",
+    "utilsim/world/field_execution.py",
+    "utilsim/world/field_reporting.py"
+  ],
+  "instructions": [
+    "Unzip; schemas and contracts are included, so no P: access is required to review this bundle.",
+    "Use fixtures/lantern-three-day-v2.json and expected-results.json for the first recipient slice.",
+    "BillingAdapter expects explicit servicePointId-to-installation bindings; example bindings are illustrative only.",
+    "Hosted observations still returns v1; this fixture comes from actual engine export_v2, not the hosted gateway.",
+    "The VS authenticated scheduler command receipt fits the producer outbox; worldfeed per-item report alone does not.",
+    "Current producer local_sender is loopback HTTP only; authenticated hosted transport remains a gap.",
+    "Use existing /api/commands and one agreed clock owner; do not restamp historical availability to bypass late-command rejection.",
+    "Follow HOSTING.md for packaging; provisioning, production connection and container build are not verified here."
+  ],
+  "fieldContractCaveat": "field-world-report/1 schema is the legacy standalone layer; current execution emits field-ack/1 and field-report/1 envelopes. Consult field_execution.py/field_reporting.py and recipient owner before adapting.",
+  "remainingFixtureSlices": [
+    "normal AMI",
+    "missing collection",
+    "two independent world/run identities",
+    "actual invoice receipt -> payment intent -> provider receipt -> ledger",
+    "actual field completion -> later read",
+    "experienced call-centre outcomes -> bounded sentiment feedback"
+  ],
+  "releaseGate": "Recipient draft candidates and collection-window fix need agreed repo/PR references and recipient execution evidence. No hosted or production compatibility claim."
+}

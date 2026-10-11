@@ -1,0 +1,23 @@
+{
+  ".gitattributes": "308a40fa1d89ae5ea4390b4c9b46a0108b09f171f07898f25d451fa0c69c4e9f",
+  "build-vs-handoff-bundle.py": "c79e635d6896fdcaeb53699b83cd28ede56b51b80daf7b06862daec63ee76b4b",
+  "deploy/hosted-runtime/CONTRACT.md": "605bcc7c35055da53d40f9c9050d2f2e3b39aff7890f804f3f58f270ee7f5d61",
+  "deploy/hosted-runtime/Dockerfile": "a604877ef1c7c1a75fa2e455994ff4f94898364c94018c8f4e379699d54a6e0a",
+  "deploy/hosted-runtime/HOSTING.md": "625a7ab59783d8b1786be0c8dd61ea3cc586f53e284342f1876ca7ecc16a2385",
+  "docs/COMPUTE_CONNECTOR_CONTRACT.md": "e4de9199f395b942e33fc5b596afd40a9115ac4131101ca82797246ee93239a4",
+  "expected-results.json": "a31f1c5440dafcb88740fd11c40408c47c9e27bb1456ecf5b7412476f43929da",
+  "fixtures/example-bindings.json": "306d0e0f93e12d5ad4f5bf1e41149e8ff6c20b9f7c3b83064676b7efdd922c36",
+  "fixtures/example-unmapped-bindings.json": "f23ee00055b91e5c526a960d2b00d50582b80b83cf4e94afba5ffbbb301f836f",
+  "fixtures/lantern-three-day-v2.json": "125f32a2c35068c79c88569e6e43f817a98d6ebd6f7d4b88da57835c19cd60eb",
+  "handoff-manifest.json": "ffe669806866649c929689080952cfcdd3eca4f3711c3458d57e178cc99dbba1",
+  "producer-contract-audit.json": "68c0ee0f75f9191b04633407988f1214c27ee9b2092db3992ff6320b5aad6509",
+  "README.md": "300466f840e4ff55c491dc3a44a4d4ab14152fdd27ffa2aad989c7ab677f1ab6",
+  "schemas/customer-contact-intent-1.schema.json": "ddfadad8ef27d60b78b6f8bfbd52ba84b3ad1b544c6e4621c30e154c39ec8cfd",
+  "schemas/customer-finance-delivery-1.schema.json": "d5909a8b4d2b185be4232a506c3c9107f243362503cc2d6bcea0b2540fa005f3",
+  "schemas/customer-finance-provider-receipt-1.schema.json": "8cb90e6250d913b932539e5d2737991f4601fa4d880cf32b3dd3cccd2cd74852",
+  "schemas/customer-finance-provider-receipt-2.schema.json": "9017e614cc7eca4af3f4565af4490256d164f8ead988c4515722211e925ecd01",
+  "schemas/field-world-report-1.schema.json": "dad831dd650b44b89c2d15eb4e63137349c92320c027d0ac5be70a4ceca4c3b0",
+  "schemas/financial-contact-intent-1.schema.json": "90c4bd1d6e05cc7a10ae9780f22504ae55919781d17cb20180c4759e07c6044c",
+  "schemas/payment-intent-1.schema.json": "223a8f9325b010509f8083193f3b0eed57d94906055c46e4482a1e7af5c0415a",
+  "schemas/utility-observations-2.0.schema.json": "84abe22669d6657d2306d9b133fa21bdc21ee4515e7aea0cffcb191689ee12cc"
+}

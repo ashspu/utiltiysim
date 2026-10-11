@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "field-world-report-1.schema.json",
+  "title": "UtilitySim field-report/1 submitted on-site report",
+  "description": "A crew claim for recipient review, not proof of physical repair or enterprise acceptance. Manual submissions can be incorrect. Physical truth remains with the world owner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specversion", "id", "source", "type", "schema", "instance_id", "subject", "time", "business_time", "correlation_id", "causation_id", "data"],
+  "properties": {
+    "specversion": {"const": "1.0"},
+    "id": {"type": "string", "minLength": 1},
+    "source": {"const": "utilsim-field"},
+    "type": {"const": "FieldReportSubmitted"},
+    "schema": {"const": "field-report/1"},
+    "instance_id": {"type": "string", "minLength": 1},
+    "subject": {"type": "string", "minLength": 1},
+    "time": {"type": "string", "format": "date-time"},
+    "business_time": {"type": "string", "format": "date"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "causation_id": {"type": "string", "minLength": 1},
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order_id", "revision", "report_ref", "outcome", "submitted_at", "crew_ref", "observations", "attachments"],
+      "properties": {
+        "order_id": {"type": "string", "minLength": 1},
+        "revision": {"type": "integer", "minimum": 1},
+        "report_ref": {"type": "string", "minLength": 1},
+        "outcome": {"enum": ["completed", "not_found"]},
+        "submitted_at": {"type": "string", "format": "date-time"},
+        "crew_ref": {"type": "string", "minLength": 1},
+        "observations": {"enum": [
+          "On-site plumbing inspection found a downstream leak. Repair completed.",
+          "On-site plumbing inspection found no active downstream leak.",
+          "On-site inspection found an electric edge fault. Assigned edge repaired; wider service restoration not verified.",
+          "On-site inspection found no active electric edge fault.",
+          "On-site inspection found a gas edge fault. Assigned edge repaired; wider service restoration not verified.",
+          "On-site inspection found no active gas edge fault.",
+          "On-site inspection found a sewer lateral blockage. Blockage cleared.",
+          "On-site inspection found no active sewer lateral blockage.",
+          "On-site water-main isolation completed using the saved valve boundaries; repair and restoration remain separate.",
+          "On-site inspection found no active water-main break to isolate.",
+          "Assigned isolated water-main break repaired; isolation remains in place pending restoration.",
+          "On-site inspection found no matching isolated water-main break to repair.",
+          "Assigned repaired water-main isolation released; wider supply restoration not verified.",
+          "On-site inspection found no matching repaired water-main isolation to restore."
+        ]},
+        "attachments": {"type": "array", "maxItems": 0}
+      }
+    }
+  }
+}

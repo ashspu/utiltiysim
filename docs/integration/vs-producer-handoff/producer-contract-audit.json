@@ -1,0 +1,243 @@
+{
+  "observationExport": {
+    "function": "World.export_v2(start,end,sewer_factor=\"0.9\",delay_seconds=0)",
+    "schema": "utility-observations/2.0",
+    "cursor": "completed collection-day range; original measured interval retained",
+    "hostedGap": "GET /hosted/worlds/{id}/observations calls legacy World.export, schema1.0"
+  },
+  "dailyOutbox": {
+    "functions": [
+      "delivery.configure",
+      "delivery.status",
+      "delivery.relay",
+      "runtime.daily_commands",
+      "runtime.DailyWorld"
+    ],
+    "envelopeFields": [
+      "id",
+      "runId",
+      "target",
+      "operation",
+      "requestedAt",
+      "availableAt",
+      "payload",
+      "cause",
+      "correlation"
+    ],
+    "receipt": "Same id and status pending|delivering|completed|failed; acceptance is scheduler durability, not domain success.",
+    "availability": "relay queues pending rows without an availability filter; scheduler owns timed execution.",
+    "failure": "Malformed or lost receipt retains the oldest pending row; concurrent retries require recipient deduplication.",
+    "hostedGap": "No hosted outbox/relay route or authenticated HTTPS sender; local_sender is loopback HTTP."
+  },
+  "contacts": {
+    "functions": [
+      "contacts.ready",
+      "contacts.relay"
+    ],
+    "schema": "customer-contact-intent/1",
+    "cursor": "available_at|sequence, available-only relative to world clock",
+    "receiptFields": [
+      "id",
+      "environmentId",
+      "fingerprint",
+      "status=accepted",
+      "receiptId"
+    ],
+    "hostedGap": "No hosted intent feed or relay route"
+  },
+  "payments": {
+    "functions": [
+      "customer_finance.ready",
+      "customer_finance.relay"
+    ],
+    "schema": "payment-intent/1",
+    "cursor": "integer sequence, available-only relative to world clock",
+    "receiptFields": [
+      "id",
+      "runId",
+      "fingerprint",
+      "status=accepted",
+      "receiptId"
+    ],
+    "semantics": "Intention reserves household cash; transport acceptance does not settle cash or enterprise ledger.",
+    "hostedGap": "No hosted payment-intent feed or relay route"
+  },
+  "invoiceReturn": {
+    "function": "customer_finance.receive_delivery",
+    "schema": "customer-finance-delivery/1",
+    "semantics": "Trusted actually delivered invoice/notice, matched world/run/cohort; USD positive cents; due/delivery dates retained; durable exact inbox dedup.",
+    "hostedGap": "No hosted authenticated return route"
+  },
+  "providerReturn": {
+    "function": "customer_finance.provider_receipt",
+    "schemas": [
+      "customer-finance-provider-receipt/1",
+      "customer-finance-provider-receipt/2"
+    ],
+    "semantics": "Full intent amount/fingerprint only. Settled consumes reserved cash; returned requires linked settlement and refunds; v2 failed releases reservation. No partial settlement.",
+    "hostedGap": "No hosted authenticated return route"
+  },
+  "financialContacts": {
+    "functions": [
+      "customer_notices.ready",
+      "customer_notices.relay"
+    ],
+    "schema": "financial-contact-intent/1",
+    "cursor": "available_at|sequence, available-only",
+    "receiptFields": [
+      "id",
+      "runId",
+      "fingerprint",
+      "status=accepted",
+      "receiptId"
+    ],
+    "semantics": "Requires actual received notice and known invoice; separate policy is not enabled by hosted v4 setup.",
+    "hostedGap": "No hosted notice-policy/feed/relay route"
+  },
+  "field": {
+    "modules": [
+      "field_execution",
+      "field_managed",
+      "field_reporting"
+    ],
+    "semantics": "Separate field DB/outbox, stable assignment/revision/report identities; physical visit and reported claim are distinct.",
+    "currentEnvelopes": [
+      "field-ack/1",
+      "field-report/1"
+    ],
+    "hostedGap": "No hosted assignment/execute/report adapter. Legacy field-world-report/1 schema is not the current execution envelope."
+  },
+  "clockAndLimits": [
+    "Managed delivery configuration prevents competing manual world advance.",
+    "DailyWorld commits a day and relays its durable outbox before completion; pending prior delivery blocks the next daily job.",
+    "VS Run.enqueue accepts durably, Run.advance orders available/sequence and rejects new backdated commands; no continuous hosted supervisor confirmed.",
+    "Producer envelope limit8MiB; gateway request64KiB, response3000000bytes, timeout20seconds. Hosted batching/transport needs explicit design without changing source identity.",
+    "Call-centre experienced-outcome return for sentiment remains a new contract gap."
+  ],
+  "schemaRequiredFields": {
+    "schemas/utility-observations-2.0.schema.json": [
+      "schemaVersion",
+      "environmentId",
+      "producer",
+      "modelVersion",
+      "townId",
+      "start",
+      "end",
+      "assets",
+      "observations",
+      "batchId"
+    ],
+    "schemas/customer-contact-intent-1.schema.json": [
+      "schemaVersion",
+      "id",
+      "environmentId",
+      "premiseId",
+      "servicePointId",
+      "commodity",
+      "callerKind",
+      "condition",
+      "experienceId",
+      "observedAt",
+      "noticedAt",
+      "createdAt",
+      "availableAt",
+      "attempt",
+      "previousContactId",
+      "reason"
+    ],
+    "schemas/financial-contact-intent-1.schema.json": [
+      "id",
+      "environmentId",
+      "runId",
+      "premiseId",
+      "recipientRef",
+      "invoiceId",
+      "deliveredDocumentId",
+      "episodeId",
+      "documentDeliveredAt",
+      "knownAt",
+      "noticedAt",
+      "createdAt",
+      "availableAt",
+      "schemaVersion",
+      "customerKind",
+      "attempt",
+      "previousContactId",
+      "reason"
+    ],
+    "schemas/payment-intent-1.schema.json": [
+      "schemaVersion",
+      "id",
+      "environmentId",
+      "runId",
+      "premiseId",
+      "recipientRef",
+      "customerKind",
+      "invoiceId",
+      "deliveredDocumentId",
+      "currency",
+      "amountCents",
+      "createdAt",
+      "availableAt",
+      "purpose"
+    ],
+    "schemas/customer-finance-delivery-1.schema.json": [
+      "schemaVersion",
+      "deliveryId",
+      "environmentId",
+      "worldFingerprint",
+      "runId",
+      "premiseId",
+      "recipientRef",
+      "invoiceId",
+      "currency",
+      "amountCents",
+      "dueDate",
+      "deliveredAt",
+      "kind",
+      "status"
+    ],
+    "schemas/customer-finance-provider-receipt-1.schema.json": [
+      "schemaVersion",
+      "receiptId",
+      "environmentId",
+      "worldFingerprint",
+      "runId",
+      "intentId",
+      "intentFingerprint",
+      "status",
+      "amountCents",
+      "currency",
+      "occurredAt",
+      "settlementReceiptId"
+    ],
+    "schemas/customer-finance-provider-receipt-2.schema.json": [
+      "schemaVersion",
+      "receiptId",
+      "environmentId",
+      "worldFingerprint",
+      "runId",
+      "intentId",
+      "intentFingerprint",
+      "status",
+      "amountCents",
+      "currency",
+      "occurredAt",
+      "settlementReceiptId"
+    ],
+    "schemas/field-world-report-1.schema.json": [
+      "specversion",
+      "id",
+      "source",
+      "type",
+      "schema",
+      "instance_id",
+      "subject",
+      "time",
+      "business_time",
+      "correlation_id",
+      "causation_id",
+      "data"
+    ]
+  }
+}
