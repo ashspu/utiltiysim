@@ -3,6 +3,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import https from 'node:https';
 import { Redis } from '@upstash/redis';
+import { setupStorageConfig } from './setup-storage.mjs';
 
 export const fail = (status, message) => { throw Object.assign(new Error(message), {status}); };
 export function endpointURL(value) {
@@ -41,7 +42,7 @@ if revision~=tonumber(ARGV[1]) then return redis.error_reply('CONNECTOR_CONFLICT
 redis.call('SET',KEYS[1],ARGV[2])
 return ARGV[2]`;
 export function connectionStore(env=process.env, redis) {
-  if (!redis) { if(!env.UPSTASH_REDIS_REST_URL||!env.UPSTASH_REDIS_REST_TOKEN) fail(503,'Connector storage unavailable.'); redis=new Redis({url:env.UPSTASH_REDIS_REST_URL,token:env.UPSTASH_REDIS_REST_TOKEN}); }
+  if (!redis) redis=new Redis(setupStorageConfig(env));
   const key=actor=>'utilitysim:compute:v1:'+createHash('sha256').update(actor).digest('hex');
   const decode=x=>typeof x==='string'?JSON.parse(x):x;
   return {get:async actor=>decode(await redis.get(key(actor))), async save(actor,input) {

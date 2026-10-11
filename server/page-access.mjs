@@ -15,7 +15,7 @@ export function createPageAccess({ env = process.env, client = cfg => new WorkOS
     const url = new URL(request.url);
     let path;
     try { path = decodeURIComponent(url.pathname); } catch { return new Response('Invalid path', {status:400}); }
-    if (publicPaths.has(path) || path.startsWith('/api/auth/') || path === '/api/runtime' || path === '/api/setups' || path.startsWith('/atlas/api/')) return pass();
+    if (publicPaths.has(path) || path.startsWith('/api/auth/') || path === '/api/runtime' || path === '/api/setups' || path === '/api/compute' || path.startsWith('/atlas/api/')) return pass();
     const headers = new Headers({'Cache-Control':'private, no-store','Vercel-CDN-Cache-Control':'no-store'});
     const pending = new Map();
     const res = { getHeader: key => pending.get(key), setHeader: (key,value) => pending.set(key,value) };
@@ -49,6 +49,7 @@ export function createPageAccess({ env = process.env, client = cfg => new WorkOS
       if (!['GET','HEAD'].includes(request.method)) return respond(405,'Method not allowed.');
       if (path === '/library.html' && !town) return redirect('/workspace.html');
       const grants = auth.user.emailVerified ? grantsFor(auth.user.id,env) : [];
+      if (path.startsWith('/compute-connection.') && !grants.some(grant => grant.role === 'owner')) return respond(403,'Owner access required.');
       if (!signedInPaths.has(path) && (town ? !permits(grants,'world.view',town) : !grants.length)) return respond(403,'Workspace access required.');
       return finish(pass({headers}));
     } catch {

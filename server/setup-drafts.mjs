@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Redis } from '@upstash/redis';
+import { setupStorageConfig } from './setup-storage.mjs';
 import catalog from './setup-catalog.json' with { type: 'json' };
 
 export { catalog };
@@ -56,8 +57,7 @@ redis.call('HSET', KEYS[1], ARGV[1], saved)
 return saved`;
 export function draftStore(env = process.env, redis) {
   if (!redis) {
-    if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) throw new Error('Setup storage unavailable');
-    redis = new Redis({ url:env.UPSTASH_REDIS_REST_URL, token:env.UPSTASH_REDIS_REST_TOKEN });
+    redis = new Redis(setupStorageConfig(env));
   }
   const key = actor => 'utilitysim:setup:v1:' + createHash('sha256').update(actor).digest('hex');
   const decode = value => typeof value === 'string' ? JSON.parse(value) : value;

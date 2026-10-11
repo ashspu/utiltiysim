@@ -2,6 +2,7 @@ import { WorkOS } from '@workos-inc/node';
 import { config, identity, reply, sameOrigin } from '../server/auth.mjs';
 import { grantsFor, permits } from '../server/permissions.mjs';
 import { catalog, validateSetup, draftStore, publicSetup } from '../server/setup-drafts.mjs';
+import { setupStorageConfigured } from '../server/setup-storage.mjs';
 
 export function createSetupsHandler({env=process.env, client=cfg=>new WorkOS(cfg.apiKey,{clientId:cfg.clientId}), store=()=>draftStore(env)}={}) {
   return async (req,res) => {
@@ -16,7 +17,7 @@ export function createSetupsHandler({env=process.env, client=cfg=>new WorkOS(cfg
       const url = new URL(req.url,cfg.origin);
       if (req.method === 'GET' && url.searchParams.get('view') === 'catalog') {
         return reply(res,200,{...catalog,sources:catalog.sources.filter(s=>permits(grants,'world.view',s.grantTownId)).map(s=>({...s,canSave:grants.some(g=>g.role==='owner'&&(g.town==='*'||g.town===s.grantTownId))})),
-          setupStorageConfigured:Boolean(env.UPSTASH_REDIS_REST_URL&&env.UPSTASH_REDIS_REST_TOKEN), runtimeConfigured:Boolean(env.UTILITYSIM_RUNTIME_URL&&env.UTILITYSIM_RUNTIME_TOKEN)});
+          setupStorageConfigured:setupStorageConfigured(env), runtimeConfigured:false});
       }
       if (req.method === 'GET') {
         const setups = (await store().list(auth.user.id)).filter(s=>permits(grants,'world.view',s.grantTownId)).map(publicSetup);
