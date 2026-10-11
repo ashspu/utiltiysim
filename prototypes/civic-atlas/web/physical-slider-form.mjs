@@ -1,4 +1,5 @@
 // JSON-schema numeric controls. The server owns the schema and physical effects.
+import {createPhysicalMix} from './physical-mix-control.mjs';
 const clone = value => structuredClone(value);
 export function getPath(value, path) { return path.split('.').reduce((node, key) => node?.[key], value); }
 export function setPath(value, path, next) { const keys = path.split('.'); let node = value; for (const key of keys.slice(0, -1)) node = node[key] ||= {}; node[keys.at(-1)] = next; }
@@ -105,6 +106,8 @@ export function physicalChoiceLabel(path, field, choice) {
   return choice;
 }
 let sequence = 0;
+export function humanSettingLabel(path,field){return({winter_mean_c:'Winter temperature',summer_mean_c:'Summer temperature',daily_weather_spread_c:'Daily variation',annual_meter_failure:'Annual failure chance',annual_meter_drift:'Annual drift chance',cashCents:'Starting cash',essentialReserveCents:'Protected cash',maxPaymentCents:'Payment limit',paymentProbability:'Payment attempt chance',noticeProbabilityPerDay:'Daily notice chance',deliveryDelaySeconds:'Contact delivery delay',repeatAfterDays:'Repeat interval',maxContacts:'Contact limit',meanAgeYears:'Typical housing age',ageSpreadYears:'Age variation',extraThermalDemandPer50Years:'Age-related thermal demand',retrofittedPercent:'Retrofitted homes',initialTrust:'Starting confidence',recoveryDays:'Confidence recovery',experienceImpact:'Service experience impact',lateBillImpact:'Late bill impact',communityInfluence:'Community influence',maxContactMultiplier:'Contact amplification'})[path.split('.').at(-1)]||field.title||'Physical setting';}
+export function formatPhysicalUnit(unit){return({'probability':'chance (0–1)','minor currency units':'minor units','UTC days':'days','percent':'%'})[unit]||unit||'';}
 export function renderPhysicalSliderForm(container, schema, options = {}) {
   const defaults = physicalDefaults(schema, options.defaults || {});
   let values = restorePhysicalPreset(schema, defaults, options.values || {});
@@ -118,48 +121,56 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
   container.append(toolbar);
   const summary = make('p'); summary.className = 'physical-errors'; summary.setAttribute('role', 'status'); summary.setAttribute('aria-live', 'polite');
   const totals=make('p');totals.setAttribute('role','status');container.append(totals);
-  const groups = new Map();
+  const groups = new Map(),mixes=[];
+  const distributions=physicalDistributions(schema).filter(mix=>mix.paths.length===3&&mix.total===100&&['amiPercent','amrPercent','manualPercent'].every(key=>mix.paths.some(path=>path.split('.').at(-1)===key))).map(mix=>({...mix,paths:['amiPercent','amrPercent','manualPercent'].map(key=>mix.paths.find(path=>path.split('.').at(-1)===key))}));
   for (const { path, schema: field } of physicalFields(schema)) {
     const groupPath = path.split('.').slice(0,-1).join('.');
     if(!groups.has(groupPath)) {
-      const group = make('fieldset'); group.className='physical-setting-group';
+      const group = make('details'); group.className='physical-setting-group';group.dataset.group=groupPath.split('.').at(-1);
       const titles=[];let node=schema;for(const part of groupPath.split('.').filter(Boolean)){node=node.properties[part];if(node.title)titles.push(node.title);}
-      group.append(make('legend',titles.join(' · ') || 'Physical settings'));groups.set(groupPath,group);container.append(group);
+      const heading=make('summary');heading.append(make('span',titles.at(-1)||'Physical settings'));
+      const body=make('div');body.className='physical-group-body';group.append(heading,body);group.open=!Object.entries(node.properties||{}).some(([key,field])=>field.type==='boolean'&&getPath(values,`${groupPath}.${key}`)===false);groups.set(groupPath,{group,heading,body});container.append(group);
+      const mix=distributions.find(mix=>mix.paths.every(path=>path.startsWith(`${groupPath}.`)));
+      if(mix){const view=createPhysicalMix(body,{values:mix.paths.map(path=>getPath(values,path)),onChange:(next,valid)=>{mix.paths.forEach((path,index)=>setPath(values,path,next[index]));update();options.onChange?.(clone(values),[...validatePhysicalValues(schema,values),...(valid?[]:[{paths:mix.paths,message:'Complete the meter mix.'}])]);}});mixes.push({mix,view});}
     }
+    if(distributions.some(mix=>mix.paths.includes(path)))continue;
     const section = make('div'); section.className = 'physical-slider-row';
-    const id = `${scope}-${path.replaceAll('.', '-')}`, label = make('label', field.title || path); label.htmlFor = `${id}-number`;
+    const id = `${scope}-${path.replaceAll('.', '-')}`, label = make('label',humanSettingLabel(path,field)); label.htmlFor = `${id}-number`;label.title=field.title||'';
     const slider = make('input'); slider.type = 'range'; slider.id = `${id}-range`; slider.setAttribute('aria-label', `${field.title || path} slider`);
     const exact = make('input'); exact.type = 'number'; exact.id = `${id}-number`; exact.setAttribute('aria-describedby', `${id}-help ${id}-error`);
     const help = make('p'); help.id = `${id}-help`; help.className = 'physical-help';
     const marker = make('p'); marker.className = 'physical-default';
     const error = make('p'); error.id = `${id}-error`; error.className = 'physical-errors';
-    const effect = field['x-control']?.effect ?? field['x-effect'], unit = field['x-control']?.unit ?? field['x-unit']; help.textContent = [field.description, typeof effect === 'string' ? effect : effect?.description, unit ? `Unit: ${unit}.` : ''].filter(Boolean).join(' ');
+    const effect = field['x-control']?.effect ?? field['x-effect'], unit = formatPhysicalUnit(field['x-control']?.unit ?? field['x-unit']); help.textContent = [field.description, typeof effect === 'string' ? effect : effect?.description].filter(Boolean).join(' ');
     slider.setAttribute('aria-describedby', help.id);
     if(field.type==='boolean' || field.type==='string') {
       const input = field.type==='boolean' ? make('input') : make('select');input.id=`${id}-number`;
       if(field.type==='boolean')input.type='checkbox';else for(const choice of field.enum){const option=make('option',physicalChoiceLabel(path,field,choice));option.value=choice;input.append(option);}
       input.setAttribute('aria-describedby',`${id}-help ${id}-error`);
-      section.classList.add('physical-choice-row');section.append(label,input,marker,help,error);groups.get(groupPath).append(section);
-      controls.set(path,{field,exact:input,marker,error});
-      input.onchange=()=>{setPath(values,path,field.type==='boolean'?input.checked:input.value);update();options.onChange?.(clone(values),validatePhysicalValues(schema,values));};continue;
+      section.classList.add('physical-choice-row');section.append(label,input,marker,help,error);
+      if(field.type==='boolean'){label.textContent=getPath(values,path)===true?'On':'Off';groups.get(groupPath).heading.append(section);groups.get(groupPath).body.append(error);input.onclick=event=>event.stopPropagation();input.setAttribute('aria-label',field.title||'Enable this behavior');marker.hidden=true;help.hidden=true;}else groups.get(groupPath).body.append(section);
+      controls.set(path,{field,exact:input,label,marker,error});
+      input.onchange=()=>{setPath(values,path,field.type==='boolean'?input.checked:input.value);if(field.type==='boolean')groups.get(groupPath).group.open=input.checked;update();options.onChange?.(clone(values),validatePhysicalValues(schema,values));};continue;
     }
     const endpoints = make('div');endpoints.className='physical-slider-labels';for(const text of field['x-control']?.labels || [])endpoints.append(make('span',text));
-    section.append(label, slider, exact,endpoints, marker, help, error); groups.get(groupPath).append(section);
+    const precision=make('div');precision.className='physical-precision';precision.append(exact,make('span',unit));
+    section.append(label, slider, precision,endpoints, marker, help, error); groups.get(groupPath).body.append(section);
     controls.set(path, { field, slider, exact, marker, error });
     function change(input) { setPath(values, path, input.value === '' ? NaN : Number(input.value)); update(input === exact ? path : null); options.onChange?.(clone(values), validatePhysicalValues(schema, values)); }
     slider.oninput = () => change(slider); exact.oninput = () => change(exact);
   }
   container.append(summary);
   function update(editingPath) {
-    const errors = validatePhysicalValues(schema, values);
+    const errors = [...validatePhysicalValues(schema, values),...mixes.flatMap(({mix,view})=>view.validate().map(message=>({paths:mix.paths,message})))];
+    for(const {mix,view} of mixes)view.setValues(mix.paths.map(path=>getPath(values,path)));
     for (const [path, control] of controls) {
       const next = getPath(values, path), baseline = getPath(defaults, path);
       if(!control.slider){
-        if(control.field.type==='boolean')control.exact.checked=next===true;else control.exact.value=next??'';
+        if(control.field.type==='boolean'){control.exact.checked=next===true;control.label.textContent=next===true?'On':'Off';}else control.exact.value=next??'';
         control.marker.textContent=`Default: ${control.field.type==='boolean'?(baseline?'Enabled':'Disabled'):physicalChoiceLabel(path,control.field,baseline)}${next===baseline?' · current value':''}`;
-        const relevant=errors.filter(error=>error.path===path||error.paths?.includes(path));control.error.textContent=relevant.map(error=>error.message).join(' ');control.exact.setAttribute('aria-invalid',String(!!relevant.length));continue;
+        const relevant=errors.filter(error=>error.path===path||error.paths?.includes(path));control.error.textContent=relevant.map(error=>error.message).join(' ');control.exact.setAttribute('aria-invalid',String(!!relevant.length));if(relevant.length)groups.get(path.split('.').slice(0,-1).join('.')).group.open=true;continue;
       }
-      const extent = sliderExtent(control.field, next), unit=control.field['x-control']?.unit ?? control.field['x-unit'];
+      const extent = sliderExtent(control.field, next), unit=formatPhysicalUnit(control.field['x-control']?.unit ?? control.field['x-unit']);
       Object.assign(control.slider, { min: extent.min, max: extent.max, step: extent.step });
       control.exact.step = control.field.multipleOf ?? (control.field.type === 'integer' ? 1 : 'any');
       if (control.field.minimum !== undefined) control.exact.min = control.field.minimum;
@@ -167,10 +178,8 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
       if (editingPath !== path) control.exact.value = Number.isFinite(next) ? next : '';
       if (Number.isFinite(next)) control.slider.value = next;
       const atDefault = Number.isFinite(next) && next === baseline;
-      const reference=control.field['x-control']?.referenceValue ?? baseline, referenceLabel=control.field['x-control']?.referenceLabel || 'Default';
-      control.marker.textContent = baseline === undefined ? 'No server default supplied.' : `Default: ${baseline}${unit ? ` ${unit}` : ''}${atDefault ? ' · current value' : ''}`;
-      if(reference!==baseline || referenceLabel!=='Default')control.marker.textContent+=` · ${referenceLabel}: ${reference}`;
-      if(Number.isFinite(next)&&Number.isFinite(baseline)&&!atDefault)control.marker.textContent+=next>baseline?' · above preset':' · below preset';
+      const reference=control.field['x-control']?.referenceValue ?? baseline;
+      control.marker.textContent = baseline === undefined ? '' : atDefault?'Default':`Default ${baseline}${unit ? ` ${unit}` : ''}`;
       const position = reference === undefined ? null : Math.max(0, Math.min(100, 100 * (reference - extent.min) / (extent.max - extent.min)));
       control.slider.style.setProperty('--default-position', position === null ? '0%' : `${position}%`);
       control.slider.dataset.hasDefault = String(position !== null);
@@ -183,9 +192,9 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
       control.slider.setAttribute('aria-valuetext', `${Number.isFinite(next) ? next : 'unset'}${unit || ''}${band?.label ? ` · ${band.label}` : ''}`);
     }
     summary.textContent = errors.length ? 'Complete the highlighted values before saving.' : '';
-    totals.textContent=physicalDistributions(schema).map(mix=>`${mix.title||'Linked mix'}: ${Number(mix.paths.reduce((sum,path)=>sum+getPath(values,path),0).toFixed(8))} / ${mix.total??100}`).join(' · ');
+    totals.textContent='';
   }
-  function apply(preset = {}) { values = restorePhysicalPreset(schema, defaults, preset); update(); options.onChange?.(clone(values), validatePhysicalValues(schema, values)); }
+  function apply(preset = {}) { values = restorePhysicalPreset(schema, defaults, preset);for(const {mix,view} of mixes)view.reset(mix.paths.map(path=>getPath(values,path)));update(); options.onChange?.(clone(values), validatePhysicalValues(schema, values)); }
   restore.onclick = () => apply(); update();
-  return { get values() { return clone(values); }, validate: () => validatePhysicalValues(schema, values), restoreDefaults: () => apply(), applyPreset: apply, setValues: apply };
+  return { get values() { return clone(values); }, validate: () => [...validatePhysicalValues(schema, values),...mixes.flatMap(({mix,view})=>view.validate().map(message=>({paths:mix.paths,message})))], restoreDefaults: () => apply(), applyPreset: apply, setValues: apply };
 }
