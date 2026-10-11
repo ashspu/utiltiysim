@@ -71,7 +71,7 @@ function configure() {
   for(const [id,key] of [['world-name','name'],['world-start','start']])root.querySelector('#'+id).oninput=e=>{draft[key]=e.target.value;markDirty();};
   const note=root.querySelector('#setup-form .workspace-note');
   const version=draft.configuration.schemaVersion;
-  note.textContent=version?'Supported physical assumptions use the daily UTC clock. Household settings apply to occupied residential households. Currency amounts use minor units: 100 units = 1 main currency unit. Existing settings stay unchanged until an explicit upgrade.':'This saved setup uses the original weather and meter settings. It stays in its original format until you explicitly add physical settings.';
+  note.textContent=version?'Fine-tune climate, meters and household behaviour. Optional groups keep their current On/Off setting; open a group to review its assumptions. Existing setups keep their saved format until an explicit upgrade.':'This saved setup uses the original weather and meter settings. It stays in its original format until you explicitly add physical settings.';
   if(version!==catalog.configuration.defaults.schemaVersion&&catalog.configuration.schemas.physical){
     const upgrade=document.createElement('button');upgrade.type='button';upgrade.textContent='Add meter, housing and sentiment settings';upgrade.onclick=()=>{draft.configuration=upgradePhysicalConfiguration(draft.configuration,catalog.configuration.defaults);markDirty();configure();};note.after(upgrade);
   }
@@ -84,13 +84,17 @@ function configure() {
 }
 function review() {
   const source=sourceFor(draft.sourceId),schema=configurationFormSchema(catalog.configuration,draft.configuration);
-  const settings=physicalFields(schema).map(({path,schema:field})=>{
+  const groups=new Map();
+  for(const {path,schema:field} of physicalFields(schema)){
     const value=getPath(draft.configuration,path),unit=field['x-control']?.unit??field['x-unit'];
     const state=field.type==='boolean'?(value?'Enabled':'Disabled'):field.type==='string'?physicalChoiceLabel(path,field,value):value;
     const groupPath=path.split('.').slice(0,-1);let group=schema;for(const part of groupPath)group=group.properties[part];
-    return `<div><dt>${esc(field.title||'Physical setting')}${group.title?`<small>${esc(group.title)}</small>`:''}</dt><dd>${esc(state)}${unit?' '+esc(unit):''}</dd></div>`;
-  }).join('');
-  root.innerHTML=`${backButton()}<p class="eyebrow">CREATE A WORLD · 3 / 3</p><h1>Ready to save your setup.</h1><p class="intro">Save these starting conditions to your account. A connected physical runtime is required to start a simulation.</p><section class="setup-review"><h2>${esc(draft.name)}</h2><dl><div><dt>Town</dt><dd>${esc(source.name)} · fixed population and geography</dd></div><div><dt>Start date</dt><dd>${esc(draft.start)}</dd></div>${settings}</dl>${schema.properties.physical?'<p class="workspace-note">Enabled household settings apply uniformly to occupied residential households. Disabled groups retain their displayed assumptions without activating that behavior. Currency amounts use minor units: 100 units = 1 main currency unit. Household cash and payment intentions do not create bills or post enterprise payments.</p>':''}<p class="workspace-note">This creates a saved setup, with no simulated days or bill processing.</p><div class="setup-actions"><button id="edit-setup">← Edit settings</button><button class="primary" id="save-setup">Save setup online</button></div><p id="save-status" role="status"></p></section>`;
+    const key=groupPath.join('.');if(!groups.has(key))groups.set(key,{title:group.title||'Physical settings',rows:[],enabled:null});
+    const entry=groups.get(key);entry.rows.push(`<div><dt>${esc(field.title||'Physical setting')}</dt><dd>${esc(state)}${unit?' '+esc(unit):''}</dd></div>`);
+    if(field.type==='boolean'&&['enabled','active'].includes(path.split('.').at(-1)))entry.enabled=value;
+  }
+  const settings=[...groups.values()].map(group=>`<details class="review-group" ${group.enabled!==false?'open':''}><summary><strong>${esc(group.title)}</strong><span>${group.enabled===null?`${group.rows.length} assumptions`:group.enabled?'On':'Off · values retained'}</span></summary><dl>${group.rows.join('')}</dl></details>`).join('');
+  root.innerHTML=`${backButton()}<p class="eyebrow">CREATE A WORLD · 3 / 3</p><h1>Ready to save your setup.</h1><p class="intro">Save these starting conditions to your account. A connected physical runtime is required to start a simulation.</p><section class="setup-review"><h2>${esc(draft.name)}</h2><dl><div><dt>Town</dt><dd>${esc(source.name)} · fixed population and geography</dd></div><div><dt>Start date</dt><dd>${esc(draft.start)}</dd></div></dl><div class="review-groups">${settings}</div>${schema.properties.physical?'<p class="workspace-note">Household assumptions apply to occupied homes. Off groups keep their values without activating that behaviour. Currency uses minor units (100 = 1 main unit). Household payment intentions do not create bills or post enterprise payments.</p>':''}<p class="workspace-note">This saves starting conditions. It does not start a simulation.</p><div class="setup-actions"><button id="edit-setup">← Edit settings</button><button class="primary" id="save-setup">Save setup online</button></div><p id="save-status" role="status"></p></section>`;
   root.querySelector('#workspace-back').onclick=home;root.querySelector('#edit-setup').onclick=configure;
   root.querySelector('#save-setup').onclick=async()=>{
     const button=root.querySelector('#save-setup'), feedback=root.querySelector('#save-status');button.disabled=true;feedback.textContent='Saving to your account…';
