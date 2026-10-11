@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "9a09f98e312841b10269f901fc1c3b845664626c8fda6cb0a951372de7406fc3",
+  "reviewedAt": "2026-10-11T02:32:36.312252+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Northern river corridor and oblique main routes create a distinct connected town fabric; internal overview and property-scale rendered review completed.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

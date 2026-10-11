@@ -1,10 +1,19 @@
 import gzip
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from scripts.benchmark_world_scale import arguments, run
+
+
+@pytest.fixture(autouse=True)
+def available_disk_budget(monkeypatch):
+    # Lifecycle tests must not depend on the developer machine's free disk.
+    # The production guard is exercised separately below.
+    monkeypatch.setattr('scripts.benchmark_world_scale.shutil.disk_usage',
+                        lambda _path: SimpleNamespace(free=100 * 1024**3))
 
 
 def source(tmp_path):
@@ -49,6 +58,21 @@ def test_same_town_cannot_be_counted_twice_by_reencoding(tmp_path):
     with pytest.raises(ValueError, match='distinct saved districts'):
         run(args(path, out, '--snapshot', str(compressed)))
     assert not out.exists()
+
+
+def test_free_space_budget_stops_before_advancing_and_can_resume(tmp_path, monkeypatch):
+    path, out = source(tmp_path), tmp_path / 'low-space'
+    monkeypatch.setattr('scripts.benchmark_world_scale.shutil.disk_usage',
+                        lambda _path: SimpleNamespace(free=1024**3))
+    stopped = run(args(path, out))
+    assert stopped['stopReason'] == 'free_space_budget'
+    assert not stopped['targetReached']
+    assert stopped['districts'][0]['truthRows'] == 0
+    monkeypatch.setattr('scripts.benchmark_world_scale.shutil.disk_usage',
+                        lambda _path: SimpleNamespace(free=100 * 1024**3))
+    resumed = run(args(path, out, '--resume'))
+    assert resumed['targetReached']
+    assert resumed['districts'][0]['truthRows'] == 2
 
 
 def test_changed_source_or_missing_saved_district_refuses_resume(tmp_path):

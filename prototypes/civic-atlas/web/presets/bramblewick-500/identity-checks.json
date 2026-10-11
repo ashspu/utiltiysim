@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "towns": [
+    {
+      "preset": "bramblewick-500",
+      "passed": true,
+      "targetHomes": 500,
+      "actualHomes": 476,
+      "premises": 501,
+      "roads": 102,
+      "blocks": 28,
+      "meters": 1467,
+      "budget": {
+        "targetHomes": 500,
+        "homeTolerance": 0.1,
+        "homes": 476,
+        "pools": 80,
+        "solar": 0,
+        "school": 1,
+        "church": 1,
+        "commercial": 16,
+        "industrial": 6
+      },
+      "problems": [],
+      "invalidLinks": [],
+      "scope": "All saved identity links and counts. Excludes visual QA, runtime and browser acceptance."
+    }
+  ]
+}

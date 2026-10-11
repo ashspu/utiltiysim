@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "copperhaven-5000",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 5690366,
+      "rawBytes": 68617275,
+      "sha256": "210ba12bee2d696cf97cda142e378d36b3d5763e85d2765898124ff4b802f803",
+      "rawSha256": "ec7e864cf2ec251d96b2c2657a5ba24d161aee2808bb40dd19037b3ba0b2612e"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 1701225,
+      "rawBytes": 10506790,
+      "sha256": "17fe8efef687b42ab5d91aa575d65a420f26b92fc7f2e1d16a9bb4078a085468",
+      "rawSha256": "9a09f98e312841b10269f901fc1c3b845664626c8fda6cb0a951372de7406fc3"
+    }
+  ]
+}

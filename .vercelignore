@@ -1,6 +1,5 @@
-# Vercel deploys only the static landing page (scripts/build_site.mjs: site/ and the brand files). Nothing Python
-# reaches it: without this, Vercel would build api/app.py as a serverless function with the whole engine's
-# dependencies, which is not the product (the engine runs in the downloaded app) and fails the deployment.
+# Vercel serves the static town shell. The physical world and billing databases
+# run in the separately configured persistent runtime.
 /api
 /utilsim
 /tests
@@ -14,7 +13,20 @@
 /web
 /packs
 /launcher
-/prototypes
+/prototypes/town-lab
+/prototypes/civic-atlas/handoff
+/prototypes/civic-atlas/*.py
+/prototypes/civic-atlas/web/presets/*/snapshot.json
+/prototypes/civic-atlas/web/presets/*/snapshot.json.gz
+/prototypes/civic-atlas/web/presets/*/geometry.json
+/prototypes/civic-atlas/web/presets/*/geometry.json.gz
+/prototypes/civic-atlas/web/presets/riverbend-500
+/deploy
 /schemas
 /assets
 /docs
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/credentials.json
+**/local-credentials.json

@@ -2,6 +2,10 @@
 __pycache__/
 *.pyc
 .venv/
+.vercel/
+.env
+.env.*
+!.env.example
 *.egg-info/
 /dist/
 /build/
@@ -10,6 +14,11 @@ __pycache__/
 # engine caches and scratch output
 .utilsim_cache/
 out/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+credentials.json
+local-credentials.json
 # node
 node_modules/
 # os
@@ -23,3 +32,15 @@ viewer*.png
 # PyInstaller generated specification
 /utility-runner.spec
 /launcher/rsrc_windows_*.syso
+
+# Town source JSON is packaged deterministically as .json.gz for distribution.
+# Working copies remain available to geometry authoring and tile baking locally.
+/prototypes/civic-atlas/web/presets/*/geometry.json
+/prototypes/civic-atlas/web/presets/ashtown-5000/snapshot.json
+/prototypes/civic-atlas/web/presets/bramblewick-500/snapshot.json
+/prototypes/civic-atlas/web/presets/lantern-bay-500/snapshot.json
+/prototypes/civic-atlas/web/presets/copperhaven-5000/snapshot.json
+/prototypes/civic-atlas/web/presets/willowmere-25000/snapshot.json
+/prototypes/civic-atlas/web/presets/foxglove-city-50000/snapshot.json
+/prototypes/civic-atlas/web/presets/two-river-forest-500/snapshot.json
+.vercel

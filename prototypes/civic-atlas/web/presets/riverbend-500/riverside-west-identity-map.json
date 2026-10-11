@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "civic-atlas-authored-identities/1",
+  "notes": "Initial assignment locked once; do not rematch IDs after geometry edits.",
+  "properties": {
+    "R01": "P-00234",
+    "R02": "P-00167",
+    "R03": "P-00235",
+    "R04": "P-00240",
+    "R05": "P-00239",
+    "R06": "P-00244",
+    "R07": "P-00217"
+  },
+  "initialDistancesPx": {
+    "R01": 71.765,
+    "R02": 80.08,
+    "R03": 81.654,
+    "R04": 51.036,
+    "R05": 65.96,
+    "R06": 71.062,
+    "R07": 76.544
+  }
+}

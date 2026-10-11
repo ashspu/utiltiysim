@@ -1,0 +1,16 @@
+services:
+  atlas:
+    build:
+      context: ../..
+      dockerfile: deploy/civic-atlas/Dockerfile
+    ports:
+      - "127.0.0.1:8044:8044"
+    volumes:
+      - atlas-worlds:/data
+    restart: unless-stopped
+    stop_grace_period: 2m
+    environment:
+      ATLAS_ALLOWED_HOSTS: "127.0.0.1,localhost"
+      ATLAS_API_TOKEN: "${ATLAS_API_TOKEN:?Set a private runtime token before starting the container}"
+volumes:
+  atlas-worlds:

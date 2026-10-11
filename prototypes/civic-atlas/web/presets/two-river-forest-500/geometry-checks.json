@@ -1,0 +1,114 @@
+[
+  {
+    "id": "population",
+    "title": "Homes and premises",
+    "status": "pass",
+    "detail": "451 homes; 476 premises; 1038 occupied-household residents.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "identities",
+    "title": "Stable, unique source identities",
+    "status": "pass",
+    "detail": "Premises, parcels, buildings, meters, service points and roads checked separately.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "valid-parcels",
+    "title": "Valid parcel geometry",
+    "status": "pass",
+    "detail": "476 parcel polygons checked.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "parcel-overlap",
+    "title": "No overlapping parcels",
+    "status": "pass",
+    "detail": "Intersections larger than 0.02 m\u00b2 are rejected.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "containment",
+    "title": "Buildings fit their parcels",
+    "status": "pass",
+    "detail": "476 building footprints checked with 2 cm tolerance.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "pavement",
+    "title": "Parcels stay clear of road pavement",
+    "status": "pass",
+    "detail": "Uses saved road widths, not painted road edges.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "streets",
+    "title": "Connected street graph",
+    "status": "pass",
+    "detail": "103 road segments; 76 road nodes.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "frontage",
+    "title": "Property frontage reaches its assigned road",
+    "status": "pass",
+    "detail": "Checks saved frontage anchors. Painted driveways and vehicle turning still need visual review.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "open-space",
+    "title": "Public and rural land stays outside parcels",
+    "status": "pass",
+    "detail": "137 parks, fields, conservation areas and shared greens checked, including polygon holes.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "services",
+    "title": "Recorded services connect to a utility source",
+    "status": "pass",
+    "detail": "1384 meters; water, electricity and gas topology. This does not calculate pressure or voltage.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "entity-bindings",
+    "title": "Every visible property resolves to its system records",
+    "status": "pass",
+    "detail": "476 premise \u2192 building, parcel, account and service mappings. Household attributes live on each premise.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "protected-land",
+    "title": "Protected corridors exclude private parcels",
+    "status": "pass",
+    "detail": "1 original conservation and water zones checked against all parcels.",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "feature-budget",
+    "title": "World-builder feature budget",
+    "status": "pass",
+    "detail": "{\"homes\": 451, \"pools\": 100, \"solar\": 0, \"school\": 1, \"church\": 1, \"commercial\": 16, \"industrial\": 6}",
+    "failureCount": 0,
+    "examples": []
+  },
+  {
+    "id": "pool-geometry",
+    "title": "Every recorded pool fits its own backyard",
+    "status": "pass",
+    "detail": "Checks presence, validity, parcel containment, buildings and pavement. AI pixels are assessed separately.",
+    "failureCount": 0,
+    "examples": []
+  }
+]

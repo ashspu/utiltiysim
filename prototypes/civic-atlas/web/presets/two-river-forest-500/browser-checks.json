@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "verifiedPremises": 476,
+  "roadSegments": 103,
+  "roadRenderAndPickSameGeometry": true,
+  "pointerSelections": [
+    "residential",
+    "school",
+    "church",
+    "industrial",
+    "commercial"
+  ],
+  "liveHistory": true,
+  "keyboardRoadSelections": 103,
+  "panZoom": true,
+  "consoleErrors": [],
+  "hybridImagesLoaded": true,
+  "pilotTileInteractive": true,
+  "mobileViewport": true,
+  "alignmentOverlay": true
+}

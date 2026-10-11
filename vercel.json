@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "echo 'static site: nothing to install'",
+  "installCommand": "npm ci --prefix packages/town-viewer",
   "buildCommand": "node scripts/build_site.mjs",
   "outputDirectory": "public",
   "cleanUrls": false

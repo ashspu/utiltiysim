@@ -37,6 +37,9 @@ class ReadOnlyWorld(World):
         finally:
             db.close()
 
+    # Preserve registration identity checks for map inspection as well as db().
+    read_db = db
+
 
 class WorldLibrary:
     def __init__(self, store):

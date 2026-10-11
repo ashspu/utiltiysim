@@ -83,6 +83,24 @@ class World:
         # The full geography snapshot is retained, but not decoded on every simulated day.
         return {r["key"]: json.loads(r["value"]) for r in db.execute("SELECT * FROM meta WHERE key!='snapshot'")}
 
+    @contextmanager
+    def read_db(self):
+        """Consistent inspection without reserving the single SQLite writer.
+
+        query_only makes accidental writes fail instead of silently turning an
+        inspection into a mutation. A deferred transaction permits concurrent
+        readers and an existing writer's last committed snapshot.
+        """
+        db = sqlite3.connect(Path(self.path).resolve().as_uri() + "?mode=ro", uri=True, timeout=30)
+        db.row_factory = sqlite3.Row
+        try:
+            db.execute("PRAGMA query_only=ON")
+            db.execute("BEGIN")
+            yield db
+        finally:
+            db.rollback()
+            db.close()
+
     @staticmethod
     def put(db, key, value):
         db.execute("INSERT OR REPLACE INTO meta VALUES(?,?)", (key, canonical(value)))

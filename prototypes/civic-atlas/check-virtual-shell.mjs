@@ -1,0 +1,30 @@
+import {chromium,browserOptions} from './browser-runtime.mjs';
+import {mkdir,writeFile} from 'node:fs/promises';
+const browser=await chromium.launch(browserOptions),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:8056/?town=two-river-forest-500&premise=P-00001#map');
+await page.waitForSelector('#property-body #property-vs',{timeout:180000});
+await page.locator('#close-property').click();
+await page.locator('nav [data-page="billing"]').click();
+await page.getByRole('button',{name:/Initialize town recipients|Check recipient setup/}).click();
+await page.getByRole('button',{name:'Check recipient setup',exact:true}).waitFor({timeout:180000});
+await page.getByRole('button',{name:'Deliver observations to MDM',exact:true}).click();
+await page.waitForFunction(()=>document.querySelector('[data-vs="ingest"]')?.disabled===false,undefined,{timeout:180000});
+await page.locator('#vs-start').fill('2026-01-01');
+await page.locator('#vs-end').fill('2026-01-08');
+await page.getByRole('button',{name:'Bill, invoice & post receivables',exact:true}).click();
+await page.waitForFunction(()=>document.querySelector('[data-vs="run"]')?.disabled===false,undefined,{timeout:180000});
+for(let i=0;i<100&&await page.locator('[data-resolve]').count();i++){
+ const form=page.locator('[data-resolve]').first(),identity=await form.getAttribute('data-resolve');await form.locator('input').fill('QA reviewed this observed synthetic high-consumption interval; release for integration proof.');
+ await Promise.all([page.waitForResponse(r=>r.url().includes('/virtual-systems/resolve')&&r.request().method()==='POST'),form.locator('button').click()]);
+ await page.waitForFunction(id=>!document.querySelector('[data-resolve="'+id+'"]'),identity,{timeout:30000});
+}
+await page.locator('#vs-start').fill('2026-01-01');await page.locator('#vs-end').fill('2026-01-08');
+await page.getByRole('button',{name:'Bill, invoice & post receivables',exact:true}).click();
+await page.waitForFunction(()=>document.querySelector('[data-vs="run"]')?.disabled===false,undefined,{timeout:180000});
+await mkdir('out/release-qa/vs-shell' ,{recursive:true});
+await page.screenshot({path:'out/release-qa/vs-shell/actual-billing.png',fullPage:true});
+const result=await page.evaluate(async()=>await(await fetch('/atlas/api/virtual-systems?town=two-river-forest-500')).json());
+await writeFile('out/release-qa/vs-shell/browser-proof.json',JSON.stringify({errors,counts:result.counts,receivedThrough:result.receivedThrough,initialized:result.initialized,mainBillingActual:await page.getByText('Actual Virtual Systems recipients').isVisible()},null,2));
+console.log(JSON.stringify({errors,counts:result.counts,receivedThrough:result.receivedThrough}));
+await browser.close();

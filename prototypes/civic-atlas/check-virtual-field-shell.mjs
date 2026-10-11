@@ -1,0 +1,10 @@
+import {chromium,browserOptions} from './browser-runtime.mjs';
+import {mkdir,writeFile} from 'node:fs/promises';
+const browser=await chromium.launch(browserOptions),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:8056/?town=two-river-forest-500&premise=P-00001#map');
+const form=page.locator('#property-body [data-field]').first();await form.waitFor({timeout:180000});
+await form.locator('input').fill('QA browser inspection: investigate water service and report actual findings.');
+const response=page.waitForResponse(r=>r.url().includes('/virtual-systems/repair')&&r.request().method()==='POST');if(await page.locator('[data-resume-field]').count())await page.locator('[data-resume-field]').first().click();else await form.locator('button').click();const received=await response,receipt=await received.json();if(!received.ok())throw Error(JSON.stringify(receipt));
+await page.locator('#accept-field input').fill('Reviewed actual crew finding; no leak was invented or presumed.');
+await page.locator('#accept-field button').click();await page.waitForFunction(()=>!document.querySelector('#accept-field'),undefined,{timeout:30000});
+await mkdir('out/release-qa/vs-shell',{recursive:true});await page.screenshot({path:'out/release-qa/vs-shell/actual-field.png'});await writeFile('out/release-qa/vs-shell/field-browser-proof.json',JSON.stringify({errors,receipt,accepted:await page.locator('#notice').textContent()},null,2));console.log(JSON.stringify({errors,order:receipt.order?.id,outcome:receipt.order?.reports?.[0]?.outcome,authenticated:receipt.authenticatedDelivery}));await browser.close();

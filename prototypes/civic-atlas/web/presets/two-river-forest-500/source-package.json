@@ -1,0 +1,22 @@
+{
+  "schema": "atlas-source-package/1",
+  "presetId": "two-river-forest-500",
+  "files": [
+    {
+      "path": "snapshot.json.gz",
+      "rawPath": "snapshot.json",
+      "bytes": 1023359,
+      "rawBytes": 7809352,
+      "sha256": "1df7ab2ad7504b1bd1cb2258c9bd36b3d05e396bd45aa1c998d7638208e361ae",
+      "rawSha256": "6aae0f48bd5b554dc44e14068cfef09f9f424f9cd6d7ccd74afe8d0d61429802"
+    },
+    {
+      "path": "geometry.json.gz",
+      "rawPath": "geometry.json",
+      "bytes": 543271,
+      "rawBytes": 1996041,
+      "sha256": "025da2eb250955a9606a26dad00416964421c6e93cd78d854ec3e3740e7f368e",
+      "rawSha256": "d0daa9ee727aafa50c198b2857fe2ada0c57a372671cb13358e469d6c4f0006d"
+    }
+  ]
+}

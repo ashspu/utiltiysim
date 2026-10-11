@@ -40,8 +40,8 @@ def inspect_snapshot(s: dict) -> None:
     _need(s.get("schemaVersion") in ("utility-town/1.0", "utility-town/2.0"), "Unsupported schemaVersion")
     _need(isinstance(s.get("id"), str) and s["id"], "town id is required.")
     homes = s.get("premises")
-    _need(isinstance(homes, list) and 1 <= len(homes) <= 10_000 and s.get("count") == len(homes),
-          "Premise count must match count and be 1–10,000.")
+    _need(isinstance(homes, list) and len(homes) >= 1 and s.get("count") == len(homes),
+          "Premise count must match count and be positive.")
     _unique([h.get("id") for h in homes], "premises")
     for h in homes:
         _point(h, h["id"])

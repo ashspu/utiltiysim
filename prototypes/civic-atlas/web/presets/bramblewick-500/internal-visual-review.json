@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "73f225aa3d0cdfb5c38b49d28d044c8e8d440bf4aad58ae60260e60de9a7f92a",
+  "reviewedAt": "2026-10-11T02:32:36.262264+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Orchard village with an oblique high street, connected irregular parcels and central common; internal whole-town and property-scale rendered review completed.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

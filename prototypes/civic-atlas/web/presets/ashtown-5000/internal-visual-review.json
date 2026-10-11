@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "atlas-internal-visual-review/1",
+  "status": "passed",
+  "sourceSha256": "22ad644c02f4a1061c8b944efe48d300ddd9b614c092ebfa459196cdc8de60d5",
+  "reviewedAt": "2026-10-11T02:32:36.281006+00:00",
+  "reviewer": "Codex internal design QA",
+  "notes": "Connected varied street-bounded neighbourhoods around a central market, church and green; internal overview, property detail and tile-boundary review completed.",
+  "evidence": [
+    "overview.webp",
+    "geometry-overview.webp",
+    "tiles.json"
+  ],
+  "userApproval": false
+}

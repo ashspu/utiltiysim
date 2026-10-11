@@ -4340,7 +4340,7 @@
         "houses": {
           "default": 480,
           "description": "Number of residential premises to place.",
-          "maximum": 10000,
+          "maximum": 50000,
           "minimum": 20,
           "title": "Houses",
           "type": "integer",

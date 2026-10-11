@@ -52,12 +52,14 @@ def _home(db, premise):
     return {"occupied": bool(home.get("occupied", True)), "occupants": int(home.get("occupants") or 0)}
 
 
-def current(db, premise):
+def current(db, premise, baseline=None):
     row = db.execute("SELECT * FROM occupancy_premises WHERE premise=?", (premise,)).fetchone() if enabled(db) else None
     if row:
         return {"occupied": bool(row["occupied"]), "occupants": row["occupants"],
                 "revision": row["revision"], "appliedCommandId": row["applied_command"]}
-    return {**_home(db, premise), "revision": 0, "appliedCommandId": None}
+    home = ({"occupied": bool(baseline.get("occupied", True)), "occupants": int(baseline.get("occupants") or 0)}
+            if baseline is not None and baseline.get("id") == premise else _home(db, premise))
+    return {**home, "revision": 0, "appliedCommandId": None}
 
 
 def inspect(world, premise, before=None, limit=25):

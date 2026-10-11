@@ -1,0 +1,9 @@
+services:
+  atlas:
+    environment:
+      ATLAS_VIRTUAL_SYSTEMS_ROOT: /opt/virtual-systems
+    volumes:
+      - type: bind
+        source: ${ATLAS_VIRTUAL_SYSTEMS_ROOT_HOST:?Set the separately installed private checkout path}
+        target: /opt/virtual-systems
+        read_only: true

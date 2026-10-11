@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "civic-atlas-landscape-review/1",
+  "sourceSha256": "dadb2c505665e887a71dd86640724d6886dbf7fe97dbed177e07b9a589984a3d",
+  "exclusions": [
+    {
+      "id": "field-013",
+      "kind": "field",
+      "bounds": [
+        332.5,
+        246.5,
+        395.5,
+        306.0
+      ],
+      "reason": "The reference shows residential lots and gardens in Garden here. Yellow housing colors were misclassified as agricultural land.",
+      "replacementLayer": "authored-properties"
+    }
+  ]
+}

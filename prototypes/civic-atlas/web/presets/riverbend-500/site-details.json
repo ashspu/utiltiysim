@@ -1,0 +1,98 @@
+{
+  "P-00113": {
+    "pool": {
+      "center": [
+        388.3333333333,
+        71
+      ],
+      "widthM": 6,
+      "depthM": 3
+    }
+  },
+  "P-00045": {
+    "pool": {
+      "center": [
+        280,
+        381.25
+      ],
+      "widthM": 6,
+      "depthM": 3
+    }
+  },
+  "P-00234": {
+    "outbuildings": [
+      {
+        "id": "draft-P-00234-outbuilding-01",
+        "kind": "outbuilding",
+        "footprint": [
+          [
+            603.0760640910031,
+            343.36707858383284
+          ],
+          [
+            603.3168094897206,
+            347.9607744437039
+          ],
+          [
+            598.1239359089969,
+            348.2329214161672
+          ],
+          [
+            597.8831905102794,
+            343.63922555629614
+          ],
+          [
+            603.0760640910031,
+            343.36707858383284
+          ]
+        ],
+        "center": [
+          600.6,
+          345.8
+        ],
+        "heading": -3,
+        "heightM": 2.4,
+        "roof": "gable",
+        "status": "Accessory traced from concept; dimensions and height are illustrative; not a separate customer"
+      }
+    ]
+  },
+  "P-00253": {
+    "outbuildings": [
+      {
+        "id": "draft-P-00253-outbuilding-01",
+        "kind": "outbuilding",
+        "footprint": [
+          [
+            545.4652702297825,
+            619.2456834439711
+          ],
+          [
+            549.7296539182208,
+            624.1512957154191
+          ],
+          [
+            545.2013964368842,
+            628.0876498893622
+          ],
+          [
+            540.9370127484459,
+            623.1820376179141
+          ],
+          [
+            545.4652702297825,
+            619.2456834439711
+          ]
+        ],
+        "center": [
+          545.3333333333334,
+          623.6666666666666
+        ],
+        "heading": -41,
+        "heightM": 2.4,
+        "roof": "gable",
+        "status": "Accessory traced from concept; dimensions and height are illustrative; not a separate customer"
+      }
+    ]
+  }
+}
