@@ -44,6 +44,7 @@ class ManagedFieldBridge:
         self.connection, self.proxy = connection, proxy
         self.owner = port.field_existing(port.world(connection), connection['world'])
         self.binding = None
+        self.require_idle = False
         state = self.authority()
         self.binding = {key: state[key] for key in ('runtimePath', 'actorId', 'crewResources')}
         self.broker = field_managed.ManagedField(self.owner, state['runtimePath'], self.authority, self.calendar)
@@ -81,6 +82,8 @@ class ManagedFieldBridge:
             raise ValueError('Use the pinned distinct crew-resource mappings.')
         if self.binding is not None and any(state.get(key) != value for key, value in self.binding.items()):
             raise ValueError('Live field authority changed during the operation.')
+        if self.require_idle and (state['runStatus'] != 'paused' or state['leaseHeld']):
+            raise ValueError('Pause the Run and release its actual delivery lease before planning or binding.')
         if job is not None:
             actual = state.get('job')
             if (not isinstance(actual, dict) or actual.get('id') != job
@@ -112,10 +115,15 @@ class ManagedFieldBridge:
                 'execute': {'jobId', 'reservationId'}, 'cancel': {'assignmentId'}}
         if action not in keys or not isinstance(value, dict) or set(value) != keys[action]:
             raise ValueError('Use exact managed field inputs; authority comes from the fixed runtime.')
+        self.require_idle = action in ('plan', 'bind')
+        try:
+            return self._command(action, value)
+        finally:
+            self.require_idle = False
+
+    def _command(self, action, value):
         if action in ('plan', 'bind'):
-            state = self.authority()
-            if state['runStatus'] != 'paused' or state['leaseHeld']:
-                raise ValueError('Pause the Run and release its actual delivery lease before planning or binding.')
+            self.authority()
         if action == 'plan':
             quote, schedule = value['quote'], value['schedule']
             if not isinstance(quote, dict) or not isinstance(schedule, dict):

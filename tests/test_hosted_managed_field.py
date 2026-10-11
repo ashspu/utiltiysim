@@ -45,6 +45,7 @@ def connected(tmp_path):
                              instant=utc(body['day'], body['time'], body['timeZone'], body['fold']))
             else:
                 assert self.path == '/connected/field-authority'
+                state['authorityCalls'] = state.get('authorityCalls', 0) + 1
                 actual = authority(None, None)
                 value.update(schemaVersion='connected-field-authority/1', worldFingerprint=meta['fingerprint'],
                     fieldOwnerId=owner.owner_id, runtimePath=str((tmp_path / 'runtime.sqlite').resolve()),
@@ -56,6 +57,8 @@ def connected(tmp_path):
                 if body.get('reservationId'):
                     value['reservation'] = actual['reservation']
                 value.update(state['change'])
+                if state.get('flipAt') and state['authorityCalls'] >= state['flipAt']:
+                    value.update(state['transition'])
             raw = json.dumps(value).encode()
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -139,3 +142,31 @@ def test_no_caller_authority_or_resource_rebinding_and_actual_assignment_proof(t
         state['change'] = {'runtimePath': str((tmp_path / 'different-runtime.sqlite').resolve())}
         with pytest.raises(ValueError, match='Persisted field authority'):
             ManagedFieldBridge(port, connection, proxy)
+
+
+@pytest.mark.parametrize('action', ['plan', 'bind'])
+@pytest.mark.parametrize('transition', [
+    {'runStatus': 'running', 'leaseActive': True, 'leaseHeld': True},
+    {'runStatus': 'running', 'leaseActive': False, 'leaseHeld': False},
+    {'runStatus': 'paused', 'leaseActive': False, 'leaseHeld': True},
+])
+def test_later_authority_transition_does_not_persist_plan_or_binding(tmp_path, action, transition):
+    with connected(tmp_path) as (_, owner, auth, schedule, port, connection, proxy, state):
+        bridge = ManagedFieldBridge(port, connection, proxy)
+        value = {'quote': request(owner), 'schedule': schedule}
+        if action == 'bind':
+            plan = bridge.command('plan', value)
+            auth.accept(bridge.broker, plan)
+            value = {'assignmentId': 'A1', 'jobId': 'visit-1', 'reservationId': 'booking-1'}
+        state.update(authorityCalls=0, flipAt=3, transition=transition)
+        bridge = ManagedFieldBridge(port, connection, proxy)
+        with pytest.raises(ValueError, match='Pause the Run'):
+            bridge.command(action, value)
+        assert state['authorityCalls'] == 3
+        assert bridge.require_idle is False
+        if action == 'plan':
+            assert field_status(port, connection)['enabled'] is False
+        else:
+            with owner.db() as db:
+                row = db.execute('SELECT binding FROM field_managed WHERE assignment=?', ('A1',)).fetchone()
+                assert row['binding'] is None
