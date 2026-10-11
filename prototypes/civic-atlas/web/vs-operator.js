@@ -50,7 +50,7 @@ function controls(){
   $('invoice-fields').disabled=locked||!$('account').options.length||!$('invoice-cycle').options.length;
   $('retry').hidden=!commands?.pending;$('retry').disabled=loading||mutating||!permitted||commands?.pending?.premiseId!==premiseId;
   $('refresh').disabled=loading||mutating;$('refresh-job').disabled=loading||mutating||!jobId;
-  $('retry-job').disabled=locked||!jobId||!['failed','interrupted'].includes(job?.status);
+  $('retry-job').disabled=locked||!jobId||!['failed','interrupted','completed_with_exceptions'].includes(job?.status);
 }
 function renderJob(value,reported=false){
   if(!safeOperatorId(value?.id)||!['billing','invoicing'].includes(value.type)||typeof value.status!=='string')throw Error('Actual job was not confirmed');

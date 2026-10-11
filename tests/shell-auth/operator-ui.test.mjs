@@ -47,3 +47,12 @@ test('two premise pages restore their own accepted job IDs when optional pointer
   for(const scenario of scenarios){const page=await harness({...scenario,store});try{await page.submit('bill-form');}finally{page.close();}}
   for(const scenario of scenarios){const reopened=await harness({...scenario,store});try{const jobs=reopened.requests.filter(item=>item.body?.action==='job');assert.equal(jobs.length,1);assert.equal(jobs[0].body.jobId,scenario.acceptedJobId);assert.equal(jobs[0].body.premiseId,scenario.selectedPremise);assert.ok(reopened.nodes.get('job').all(node=>node.textContent===scenario.acceptedJobId).length);}finally{reopened.close();}}
 });
+test('completed-with-exceptions retry requires actual job read and uses that original job ID',async()=>{
+  const h=await harness();try{
+    await h.submit('bill-form');assert.equal(h.nodes.get('retry-job').disabled,true,'Accepted job snapshot never authorizes a retry');
+    h.setJobStatus('completed_with_exceptions');await h.nodes.get('refresh-job').onclick();assert.equal(h.nodes.get('retry-job').disabled,false);
+    await h.nodes.get('retry-job').onclick();const request=h.requests.find(item=>item.body?.action==='retry-job').body;
+    assert.equal(request.jobId,'actual-job');assert.equal(request.premiseId,premiseId);assert.ok(request.commandId);assert.equal(h.nodes.get('retry-job').disabled,true,'New accepted retry snapshot must be inspected before another retry');
+    for(const status of ['queued','running','completed']){h.setJobStatus(status);await h.nodes.get('refresh-job').onclick();assert.equal(h.nodes.get('retry-job').disabled,true);}
+  }finally{h.close();}
+});
