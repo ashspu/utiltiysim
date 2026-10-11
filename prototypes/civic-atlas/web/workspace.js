@@ -1,12 +1,27 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
 import { renderSchemaForm } from '/viewer/schema-form.js';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
-let catalog, selected, draft, form, dirty = false, saveCommand = null;
+let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
+const isOwner = () => session.grants.some(g => g.role === 'owner');
+const worldLink = id => /^[0-9a-f]{32}$/.test(id || '') ? `/world-control.html?id=${id}` : null;
+const startKey = setup => `utilitysim:start:${session.user.id}:${setup.id}`;
+function readStart(setup) {
+  const value = sessionStorage.getItem(startKey(setup));
+  if (!value) return null;
+  const record = JSON.parse(value);
+  if (!record.payload?.commandId || record.payload.sourceId !== setup.sourceId) throw new Error('The saved start request needs recovery before starting this setup.');
+  return record;
+}
+const canStart = setup => {
+  const source = sourceFor(setup.sourceId);
+  return Boolean(source?.canConfigure && source.canSave && source.sourceRevision === setup.sourceRevision
+    && session.grants.some(g => g.role === 'owner' && (g.town === '*' || g.town === source.grantTownId)));
+};
 const sourceFor = id => catalog.sources.find(s => s.id === id);
 async function api(url, options) {
   const response = await fetch(url,{cache:'no-store',...options});
   const value = await response.json();
-  if (!response.ok) throw new Error(value.detail || 'Your workspace could not be loaded.');
+  if (!response.ok) { const error=new Error(value.detail || 'Your workspace could not be loaded.');error.status=response.status;throw error; }
   return value;
 }
 const message = text => { status.textContent = text; };
@@ -55,14 +70,55 @@ function review() {
 async function openLibrary() {
   if(!mayLeave())return;
   dirty=false;
-  root.innerHTML=`${backButton()}<p class="eyebrow">YOUR LIBRARY</p><h1>Pick up where you left off.</h1><h2>Saved setups</h2><p class="workspace-note">Starting conditions saved to your account. These are separate from running simulations.</p><div id="saved-setups" class="saved-setups" role="status">Loading saved setups…</div><section class="runtime-note"><h2>Existing simulations</h2><p>Online simulation compute is not connected yet. Your existing offline simulations and their history remain in the offline app.</p></section>`;
+  root.innerHTML=`${backButton()}<p class="eyebrow">YOUR LIBRARY</p><h1>Pick up where you left off.</h1><h2>Saved setups</h2><p class="workspace-note">Starting conditions saved to your account. Starting a simulation pins these values; its initial settings cannot be edited afterward.</p><div id="saved-setups" class="saved-setups" role="status">Loading saved setups…</div><section class="runtime-note"><h2>Existing simulations</h2>${isOwner()?'<p><a href="/compute-connection.html">Manage compute connection →</a></p>':''}<div id="runtime-library" role="status">Loading your simulation worlds…</div><p class="workspace-note">Existing offline simulations and their history remain in the offline app.</p></section>`;
   root.querySelector('#workspace-back').onclick=home;
   const list=root.querySelector('#saved-setups');
-  try{const {setups}=await api('/api/setups');list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><span class="eyebrow">SAVED SETUP · NOT STARTED</span><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>Saved ${esc(new Date(s.updatedAt).toLocaleString())}</small><button data-open-setup="${esc(s.id)}">Review setup →</button></article>`).join(''):'<p>No online setups saved yet. Create a world to choose its starting conditions.</p>';list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an earlier map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});}
+  const runtime=root.querySelector('#runtime-library');
+  void loadWorlds(runtime);
+  try{const {setups}=await api('/api/setups');if(!list.isConnected)return;list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><span class="eyebrow">SAVED STARTING CONDITIONS</span><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>Saved ${esc(new Date(s.updatedAt).toLocaleString())}</small><div class="saved-setup-actions"><button data-open-setup="${esc(s.id)}">Review setup →</button>${canStart(s)?`<button class="primary" data-start-setup="${esc(s.id)}">Start simulation</button>`:''}</div><p class="start-feedback" role="status"></p></article>`).join(''):'<p>No online setups saved yet. Create a world to choose its starting conditions.</p>';list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||!source.canConfigure||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an unavailable map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});
+    list.querySelectorAll('[data-start-setup]').forEach(button=>{
+      const setup=setups.find(s=>s.id===button.dataset.startSetup),feedback=button.closest('article').querySelector('.start-feedback');
+      try { const pending=readStart(setup); if(pending?.worldId){showStarted(button,feedback,pending.worldId);return;} if(pending){button.textContent='Retry original start';feedback.textContent='A previous start has not been confirmed. Retry uses its original saved conditions.';} }
+      catch(error){button.disabled=true;feedback.textContent=error.message;return;}
+      button.onclick=()=>startSetup(setup,button,feedback,runtime);
+    });
+  }
   catch(error){list.textContent=error.message;const retry=document.createElement('button');retry.textContent='Retry saved setups';retry.onclick=openLibrary;list.append(retry);}
 }
+function showStarted(button,feedback,id) {
+  const href=worldLink(id);
+  if(!href)throw new Error('The runtime returned an invalid simulation identifier. Retry the original start request.');
+  button.disabled=true;button.textContent='Simulation started';
+  feedback.innerHTML=`<a href="${href}">Open simulation →</a><br>Its initial settings are fixed. Editing the saved setup does not change this world.`;
+}
+async function startSetup(setup,button,feedback,runtime) {
+  if(!canStart(setup))return;
+  button.disabled=true;feedback.textContent='Starting your simulation…';
+  try {
+    let record=readStart(setup);
+    if(record?.worldId){showStarted(button,feedback,record.worldId);return;}
+    if(!record){const {sourceId,sourceRevision,name,start,configuration}=setup;record={setupRevision:setup.revision,payload:{commandId:crypto.randomUUID(),sourceId,sourceRevision,name,start,configuration:structuredClone(configuration)}};}
+    // Persist before sending. A lost response or reload must replay exactly this command and payload.
+    sessionStorage.setItem(startKey(setup),JSON.stringify(record));
+    const world=await api('/api/compute?action=create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record.payload)});
+    if(!worldLink(world.id))throw new Error('The runtime returned an invalid simulation identifier.');
+    record.worldId=world.id;sessionStorage.setItem(startKey(setup),JSON.stringify(record));
+    showStarted(button,feedback,world.id);
+    if(runtime.isConnected)void loadWorlds(runtime);
+  }catch(error){feedback.textContent=`${error.message} The original start request is retained; retry it to recover the same simulation.`;button.disabled=false;button.textContent='Retry original start';}
+}
+async function loadWorlds(container,offset=0) {
+  container.textContent='Loading your simulation worlds…';
+  try {
+    const result=await api(`/api/compute?action=worlds&offset=${offset}&limit=25`);
+    if(!Array.isArray(result.worlds)||!Number.isInteger(result.total)||!Number.isInteger(result.offset)||!Number.isInteger(result.limit)||result.limit<1)throw new Error('The runtime returned an invalid simulation library.');
+    if(!container.isConnected)return;
+    container.innerHTML=result.worlds.length?`<div class="saved-setups">${result.worlds.map(world=>{const href=worldLink(world.id);return `<article class="saved-setup"><span class="eyebrow">SIMULATION · ${esc(world.state||'STATUS UNAVAILABLE')}</span><h3>${esc(world.name||'Saved simulation')}</h3><p>${esc(sourceFor(world.sourceId)?.name||world.sourceId)}</p><p>${world.through?`Through ${esc(world.through)}`:`Starts ${esc(world.start||'date unavailable')}`}</p>${world.available===false?`<p>${esc(world.error||'This simulation is currently unavailable.')}</p>`:''}${href?`<a class="runtime-open" href="${href}">Open simulation →</a>`:'<p>Invalid simulation identity; contact the runtime owner.</p>'}</article>`;}).join('')}</div>`:'<p>No online simulations are saved on this connected runtime.</p>';
+    if(result.total>result.limit){const pages=document.createElement('div');pages.className='runtime-pagination';pages.innerHTML=`<button data-page="previous" ${offset===0?'disabled':''}>← Previous</button><span>${result.total} simulations</span><button data-page="next" ${result.offset+result.limit>=result.total?'disabled':''}>Next →</button>`;pages.querySelector('[data-page="previous"]').onclick=()=>loadWorlds(container,Math.max(0,result.offset-result.limit));pages.querySelector('[data-page="next"]').onclick=()=>loadWorlds(container,result.offset+result.limit);container.append(pages);}
+  }catch(error){if(!container.isConnected)return;container.textContent=error.status===503?`Online compute is disconnected or unavailable. ${error.message}`:`Simulation library could not be loaded. ${error.message}`;const retry=document.createElement('button');retry.textContent='Retry simulation library';retry.onclick=()=>loadWorlds(container,offset);container.append(retry);}
+}
 async function start(){
-  try{const session=await readSession();if(!session.authenticated){location.replace(loginUrl('/workspace.html'));return;}if(!session.grants.length){message('Your account is awaiting workspace access from an administrator.');return;}catalog=await api('/api/setups?view=catalog');message(`Welcome, ${session.user.name||session.user.email}.`);home();}
+  try{session=await readSession();if(!session.authenticated){location.replace(loginUrl('/workspace.html'));return;}if(!session.grants.length){message('Your account is awaiting workspace access from an administrator.');return;}catalog=await api('/api/setups?view=catalog');message(`Welcome, ${session.user.name||session.user.email}.`);home();}
   catch(error){message(error.message);}
 }
 start();
