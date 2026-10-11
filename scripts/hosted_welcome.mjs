@@ -13,8 +13,8 @@ export function hostedWelcome(source) {
   replace(/<header class="welcome-masthead">[\s\S]*?<\/header>/, '');
   replace(/<dialog id="welcome-sign-in-dialog"[\s\S]*?<\/dialog>/, '');
   replace(/<section class="saved-world-section">[\s\S]*?<\/section>/, '');
-  replace(/<img id="hero-image"[^>]+>/, '<img id="hero-image" src="/assets/lantern-harbour-welcome.webp" srcset="/assets/lantern-harbour-welcome-small.webp 1266w, /assets/lantern-harbour-welcome.webp 2532w" sizes="(max-width:760px) 100vw, 58vw" fetchpriority="high" width="2532" height="2486" alt="The complete Lantern Harbour illustrated map, showing its marina, waterfront neighborhoods, connected streets and central park">');
-  replace(/<span id="hero-geography"[^>]*>[\s\S]*?<\/span>/, '<span id="hero-geography" class="welcome-art-caption">Lantern Harbour · whole-map illustration</span>');
+  replace(/<img id="hero-image"[^>]+>/, '<img id="hero-image" src="/assets/civic-welcome-landscape.png" fetchpriority="high" alt="UtilitySim concept illustration: a leafy river town, connected streets, gardens and a water tower">');
+  replace(/<span id="hero-geography"[^>]*>[\s\S]*?<\/span>/, '');
   replace(/<section class="welcome-connections"[\s\S]*?<\/section>/, '');
   replace(/<section class="welcome-ecosystem">[\s\S]*?<\/section>/, ecosystemMarkup());
   replace(/<div class="welcome-hero">/, `<div class="welcome-hero"><div class="hero-brand"><img src="/brand/utility-studio-icon-color.svg" alt="" width="64" height="64"><span>UtilitySim</span></div>`);

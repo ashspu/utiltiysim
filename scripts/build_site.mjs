@@ -16,6 +16,7 @@ for (const file of ['physical-slider-form.mjs','physical-slider-form.css']) shel
 for (const file of ['compute-connection.html','compute-connection.js','compute-connection.css','world-control.html','world-control.js','world-control.css','world-control-core.mjs','world-control-events.mjs']) shellFiles.add(file);
 const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
 const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
+const workspaceAssets = new Set(['lantern-harbour-welcome.webp','lantern-harbour-welcome-small.webp']);
 for (const match of welcomeHtml.matchAll(/srcset="([^"]+)"/g)) {
   for (const candidate of match[1].split(',')) {
     const asset = candidate.trim().split(/\s+/)[0];
@@ -54,7 +55,7 @@ fs.mkdirSync(out, {recursive: true});
 fs.cpSync(web, out, {recursive: true, filter(source) {
   const relative = path.relative(web, source).split(path.sep);
   if (!relative[0]) return true;
-  if (relative[0] === 'assets') return relative.length === 1 || (relative.length === 2 && welcomeAssets.has(relative[1]));
+  if (relative[0] === 'assets') return relative.length === 1 || (relative.length === 2 && (welcomeAssets.has(relative[1]) || workspaceAssets.has(relative[1])));
   if (relative[0] !== 'presets') return relative.length === 1 && shellFiles.has(relative[0]);
   if (relative.length === 1 || relative[1] === 'catalog.json' || relative[1] === 'shared') return true;
   if (!townIds.has(relative[1])) return false;
