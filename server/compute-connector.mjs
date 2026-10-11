@@ -16,8 +16,14 @@ export function publicAddress(address) {
     const [a,b] = address.split('.').map(Number);
     return !(a===0 || a===10 || a===127 || a>=224 || a===169&&b===254 || a===172&&b>=16&&b<=31 || a===192&&(b===168||b===0) || a===100&&b>=64&&b<=127 || a===198&&(b===18||b===19||b===51) || a===203&&b===0);
   }
-  // Reject mapped/transition/link-local/ULA IPv6; only global unicast is allowed.
-  return isIP(address)===6 && /^[23][0-9a-f]{3}:/i.test(address) && !/^2001:(?:0:|db8:|10:|20:)/i.test(address) && !/^2002:/i.test(address);
+  // Expand numeric hextets before prefix checks: compressed/leading-zero forms
+  // must not bypass transition and special-purpose range exclusions.
+  if(isIP(address)!==6||address.includes('.')||address.includes('%'))return false;
+  const [left,right]=address.toLowerCase().split('::');
+  const head=left?left.split(':'):[],tail=right?right.split(':'):[];
+  const parts=right===undefined?head:[...head,...Array(8-head.length-tail.length).fill('0'),...tail];
+  const words=parts.map(part=>parseInt(part,16)),[first,second]=words;
+  return words.length===8&&first>=0x2000&&first<0x4000&&first!==0x2002&&first!==0x3fff&&!(first===0x2001&&(second<0x0200||second===0x0db8));
 }
 function encryptionKey(secret) {
   if (typeof secret !== 'string' || secret.length<32) fail(503,'Connector encryption unavailable.');
@@ -62,7 +68,16 @@ export function connectionStore(env=process.env, redis) {
 export async function runtimeRequest({endpoint,token,actor,grants,path,method='GET',body}, {resolve=lookup, request=https.request, timeout=20000,maxBytes=3000000}={}) {
   endpointURL(endpoint);
   if(!token) fail(503,'Configure a runtime credential first.');
-  const url=new URL(path,endpoint), addresses=await resolve(url.hostname,{all:true,verbatim:true});
+  const started=Date.now(),url=new URL(path,endpoint);
+  let dnsTimer;
+  const dnsTimeout=new Promise((_resolve,reject)=>{dnsTimer=setTimeout(()=>reject(Object.assign(new Error('Runtime DNS lookup timed out.'),{status:504})),timeout);});
+  let addresses;
+  try {addresses=await Promise.race([resolve(url.hostname,{all:true,verbatim:true}),dnsTimeout]);}
+  finally {clearTimeout(dnsTimer);}
+  // A late DNS result cannot create a request after the race rejects. Request
+  // receives only the remaining overall budget, rather than a fresh timeout.
+  const remaining=timeout-(Date.now()-started);
+  if(remaining<=0)fail(504,'Runtime request timed out.');
   if(!addresses.length||addresses.some(x=>!publicAddress(x.address))) fail(422,'Runtime resolves to a restricted network address.');
   const target=addresses[0], payload=body===undefined?null:JSON.stringify(body);
   return new Promise((resolveResult,reject)=>{
@@ -72,6 +87,6 @@ export async function runtimeRequest({endpoint,token,actor,grants,path,method='G
       let size=0;const chunks=[]; res.on('data',chunk=>{size+=chunk.length;if(size>maxBytes){res.destroy(Object.assign(new Error('Runtime response exceeds gateway limit.'),{status:502}));}else chunks.push(chunk);});
       res.on('error',reject);res.on('end',()=>{try{const data=JSON.parse(Buffer.concat(chunks));resolveResult({status:res.statusCode,data});}catch{reject(Object.assign(new Error('Invalid runtime response.'),{status:502}));}});
     });
-    const timer=setTimeout(()=>req.destroy(Object.assign(new Error('Runtime request timed out.'),{status:504})),timeout);req.on('close',()=>clearTimeout(timer));req.on('error',reject);req.end(payload);
+    const timer=setTimeout(()=>req.destroy(Object.assign(new Error('Runtime request timed out.'),{status:504})),remaining);req.on('close',()=>clearTimeout(timer));req.on('error',reject);req.end(payload);
   });
 }

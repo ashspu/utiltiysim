@@ -25,7 +25,7 @@ export function createComputeHandler({env=process.env,client=cfg=>new WorkOS(cfg
   let path,body=req.body;
   if(action==='test')path='/hosted/sources';
   if(action==='worlds') {const offset=url.searchParams.get('offset')||'0',limit=url.searchParams.get('limit')||'25';if(!/^\d{1,8}$/.test(offset)||!/^\d{1,2}$/.test(limit)||+limit<1||+limit>50)fail(422,'Invalid world pagination.');path=`/hosted/worlds?offset=${offset}&limit=${limit}`;}
-  if(action==='create') {const source=catalog.sources.find(s=>s.id===body?.sourceId);if(!source||source.sourceRevision!==body.sourceRevision)fail(409,'Select the current approved source revision.');if(!owner(source.grantTownId))fail(403,'Owner access to this source required.');path='/hosted/worlds';}
+  if(action==='create') {const source=catalog.sources.find(s=>s.id===body?.sourceId);if(!source||source.canConfigure!==true||source.sourceRevision!==body.sourceRevision)fail(409,'Select the current approved source revision.');if(!owner(source.grantTownId))fail(403,'Owner access to this source required.');path='/hosted/worlds';}
   if(['status','advance','observations','storms','events','sentiment'].includes(action)) {
     const id=url.searchParams.get('id');if(!worldId.test(id||''))fail(422,'Invalid world identifier.');
     const status=await invoke('/hosted/worlds/'+id);if(status.status!==200)return reply(res,status.status,status.data);
