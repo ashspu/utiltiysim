@@ -170,6 +170,9 @@ class World:
         base_scale = 0.5 + 0.5 * ratio
         heating = max(0, 18 - temperature) * floor * 0.045
         cooling = max(0, temperature - 20) * floor * 0.018 if p.get("hasAC") else 0
+        thermal_multiplier = p.get("thermalDemandMultiplier", 1)
+        heating *= thermal_multiplier
+        cooling *= thermal_multiplier
         commodity = asset["commodity"]
         if commodity == "electric":
             base = float(p.get("dailyKWh") or (4 + 0.03 * floor + 1.5 * baseline_people))
@@ -196,7 +199,9 @@ class World:
             hazards,
             network_faults,
             occupancy,
+            physical_profiles,
             registers,
+            sentiment,
             sewer,
             storms,
             water_faults,
@@ -233,6 +238,7 @@ class World:
                 meta["_hazards"] = hazards.daily(self, db, meta, temperature)
                 outages = network_faults.daily(self, db, meta)
                 water_outages = water_mains.daily(self, db, meta)
+                meter_profiles = physical_profiles.meter_profiles(db, meta)
                 for record in db.execute("SELECT * FROM assets ORDER BY id").fetchall():
                     a = dict(record)
                     # Assets not yet commissioned cannot supply observations.
@@ -258,10 +264,14 @@ class World:
                     observed = None if a["condition"] == "failed" else f"{truth * a['drift']:.4f}"
                     observation_id = stable(env, a["id"], ds, "observation")
                     db.execute("INSERT INTO truth VALUES(?,?,?)", (a["id"], ds, f"{truth:.4f}"))
+                    collect, observed = physical_profiles.measure(db, meta, a, ds, observed, observation_id, meter_profiles.get(a['id']))
+                    if not collect:
+                        continue
                     db.execute("INSERT INTO observations VALUES(?,?,?,?,?,?)",
                                (observation_id, a["id"], ds, a["device"], observed,
                                 "missing" if observed is None else "observed"))
                     registers.record(db, observation_id, a["device"], observed)
+                sentiment.daily(self, db, meta)
                 contacts.daily(self, db, meta)
                 customer_finance.daily(self, db, meta)
                 event = self.event(db, env, ds, "WorldDayCompleted", meta["town"], {"temperatureC": temperature})
@@ -331,14 +341,18 @@ class World:
                   for r in db.execute("SELECT * FROM assets ORDER BY id")]
         lookup = {a["meterId"]: a for a in assets}
         observations = []
+        from .physical_profiles import intervals
+
+        read_intervals = intervals(db, m, start, end)
         for r in db.execute("SELECT * FROM observations WHERE day>=? AND day<? ORDER BY day,asset",
                             (start, end)):
             a = lookup[r["asset"]]
             finish = (date.fromisoformat(r["day"]) + timedelta(days=1)).isoformat()
+            period_start = read_intervals.get(r['id'], {}).get('start', r['day'])
             observations.append({"sourceId": r["id"], "meterId": a["meterId"],
                                  "deviceId": r["device"], "installationId": a["installationId"],
                                  "commodity": a["commodity"], "unit": a["unit"],
-                                 "start": r["day"], "end": finish, "quantity": r["quantity"],
+                                 "start": period_start, "end": finish, "quantity": r["quantity"],
                                  "status": r["status"], "observedAt": finish + "T00:00:00Z"})
         result = {"schemaVersion": SCHEMA_VERSION, "environmentId": m["environment"],
                   "producer": "UtilitySim", "modelVersion": m["modelVersion"], "townId": m["town"],

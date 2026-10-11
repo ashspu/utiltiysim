@@ -1,0 +1,70 @@
+{
+  "source": "P:/Codex/2026-10-10/prototypes-civic-atlas-start-elsewhere-md/outputs/lantern-harbour-final",
+  "sceneSha256": "db3d56e41a436298040666c3467b48d54d949950c8651b8b14589dde33ecd76f",
+  "capture": "Chromium rendered SVG defs, backdrop, artwork and parcelArtwork layers; UI, parcel interaction and unresolved overlays excluded",
+  "viewBox": [
+    0,
+    0,
+    1266,
+    1243
+  ],
+  "width": 2532,
+  "height": 2486,
+  "asset": "lantern-harbour-welcome.png",
+  "sha256": "5e4cf5b219d37eca970789129bffbee95840f9d41ad1153118ad7dc85c2c5075",
+  "panels": [
+    {
+      "sha256": "9db979a8f45f7b1fb831ce4cf8bba23b7185dcca74acb7856b3cccfe1a960629",
+      "image": "panels/11-v2.png"
+    },
+    {
+      "sha256": "e5a18cb917777f792893c57adaf4e7819f84654c991c1f5598a2ecb124366f77",
+      "image": "panels/12.png"
+    },
+    {
+      "sha256": "c29cf757446f6f6ff522ecedf7b5107a33ce129fbde474344a8c67d092064231",
+      "image": "panels/13.png"
+    },
+    {
+      "sha256": "0c9dedde26416bc4c1cba5ce43b81c08fa80abaa1fd2a1786fb96fb8beb2799a",
+      "image": "panels/21.png"
+    },
+    {
+      "sha256": "6e1ca793954ab2005a264eafb9c79f8019cb80dc3471d67d995f1039c6b42576",
+      "image": "panels/22.png"
+    },
+    {
+      "sha256": "4318312ab34b196fc418eca44b7b3c8054f3f32c645c54c52cb443a4f260d1c8",
+      "image": "panels/23.png"
+    },
+    {
+      "sha256": "b4bea9e5c1765442adca479357e5853784eab963c75804a4061524c350b32d61",
+      "image": "panels/31.png"
+    },
+    {
+      "sha256": "f18434e5e117bb2a21ce118bb3be52240535ed1fa95d9cd870237d89654fdb43",
+      "image": "panels/32.png"
+    },
+    {
+      "sha256": "a24a14088df2067607402f1d329a22dcd9937bc00d328eb37dc287c75b170f04",
+      "image": "panels/33.png"
+    }
+  ],
+  "ecosystemReference": {
+    "semantics": "Red integration flow and gray navigation flow faithfully transcribed. Intended architecture, not connected status.",
+    "source": "Greg original chat turn 01a12309-0676-7646-8105-bc4d5c87c945",
+    "sha256": "2a76e1c1ac4444b622c78d16543e462afa28b7b25766c5e829d0dbce030224b6"
+  },
+  "webDelivery": [
+    {
+      "bytes": 1883596,
+      "asset": "lantern-harbour-welcome.webp",
+      "sha256": "f3d8df86572a7872d03aad0ddad2d048de2e79dd727da62ac200fc15f2fc9b20"
+    },
+    {
+      "bytes": 568182,
+      "asset": "lantern-harbour-welcome-small.webp",
+      "sha256": "54b128a0b845488b7bb6d7325b833973446e1d17280f7c1bec117976ec77cb71"
+    }
+  ]
+}

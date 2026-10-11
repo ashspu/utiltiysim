@@ -40,3 +40,49 @@ The setup chapter now crops the finished industrial study from `web/assets/civic
 ## Still to do
 
 A real identity provider and server-side authorization remain separate implementation work. The local workspace is not an authenticated session. Further shell iteration and map fidelity work continue independently; this welcome pass does not establish product-wide acceptance.
+
+## Hosted continuity correction — 11 October 2026
+
+Greg reaffirmed this welcome direction with the original river-town screenshot.
+His earlier request in “Set up utiltiysim” (thread
+`01a122fd-a2dc-76d8-82ac-544cb1d3e0e1`, turn
+`01a12661-9ea7-706c-8420-4aa1bc4016f8`) called the splash page “looking great”
+and requested the top-right login menu and a parallax explanation below it.
+The subsequent localhost request was to see this working website, not another PNG.
+
+The hosted authentication release incorrectly introduced a separate generic
+`landing.html`. The release build now derives its homepage from the welcome
+section of `web/index.html` through `scripts/hosted_welcome.mjs`, reusing
+`welcome.css`, `welcome.js`, and all five original concept images. There is one
+visual source for both entry experiences; do not replace the hero or scroll
+narrative when working on authentication, deployment, or map delivery.
+
+Hosted differences are limited to real WorkOS Account controls and an explicit
+catalog-based town choice. The old local Brookfield saved-day/resident card is
+not evidence of a saved hosted session and is replaced with the town library.
+Entry does not automatically choose or restore a town. Concept imagery remains
+labeled; map fidelity and hosted runtime configuration are separate work.
+`landing.js` connects introduction actions to the chosen town and destination.
+The offline prototype retains its original account-information dialog.
+
+## Greg's next hosted revision — 11 October 2026
+
+Supersedes the hosted controls above: Greg requested one Log in link at the
+former Explore worlds position, no Discover link, no masthead/navigation/Account
+menu, and removal from “A world ready to explore” onward. Preserve the river art
+and parallax chapters before that point. Public ecosystem cards and chapter
+descriptions are informational; they do not open applications. All hosted
+user-facing Civic Atlas branding is removed.
+
+The genuine approved utility icon (`utility-studio-icon-color.svg`, option 5,
+approved 2 October and documented in assets/brand/utility-studio/README.md) is
+paired with the current UtilitySim name inside the hero. The old horizontal
+Utility Studio wordmark is not relabeled or passed off as a UtilitySim logo.
+
+WorkOS entry now leads to `/workspace.html`, which requires authentication and
+offers deliberate selection of authorized towns. Static workspace/map/catalog
+resources are gated on the server by Routing Middleware; the runtime API retains
+its own independent permission checks. Root contains one application link and no
+world data requests. Hosted entry never restores a remembered/default map.
+These changes are owned by the shell/auth workstream; map artwork and stored
+worlds remain under their existing owners.

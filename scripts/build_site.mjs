@@ -3,13 +3,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {hostedWelcome} from './hosted_welcome.mjs';
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const out = path.join(repo, 'public');
 const web = path.join(repo, 'prototypes/civic-atlas/web');
 const catalog = JSON.parse(fs.readFileSync(path.join(web, 'presets/catalog.json'), 'utf8'));
 const townIds = new Set(catalog.presets.map(p => p.id));
 const presetFiles = new Set(['tiles.json', 'premise-index.json', 'landmarks.json', 'overview.webp', 'overview.json', 'geometry-overview.webp']);
-const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js']);
+const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js', 'landing.js', 'landing.css', 'shell-session.js', 'style.css', 'welcome.css', 'welcome.js']);
+for (const file of ['workspace.html','workspace.js','workspace.css','workspace-start-state.mjs']) shellFiles.add(file);
+for (const file of ['physical-slider-form.mjs','physical-slider-form.css']) shellFiles.add(file);
+for (const file of ['compute-connection.html','compute-connection.js','compute-connection.css','world-control.html','world-control.js','world-control.css','world-control-core.mjs','world-control-events.mjs','world-control-sentiment.mjs']) shellFiles.add(file);
+const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
+const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
+const workspaceAssets = new Set(['lantern-harbour-welcome.webp','lantern-harbour-welcome-small.webp']);
+for (const match of welcomeHtml.matchAll(/srcset="([^"]+)"/g)) {
+  for (const candidate of match[1].split(',')) {
+    const asset = candidate.trim().split(/\s+/)[0];
+    if (!asset.startsWith('/assets/') || asset.includes('..')) throw new Error('Invalid welcome image candidate');
+    welcomeAssets.add(asset.slice('/assets/'.length));
+  }
+}
+for (const asset of welcomeAssets) {
+  if (!fs.existsSync(path.join(web, 'assets', asset))) throw new Error(`Missing welcome art: ${asset}`);
+}
 if (!fs.existsSync(path.join(web, 'library.html'))) throw new Error('Town-library shell is not built.');
 for (const town of catalog.presets) {
   const folder = path.join(web, 'presets', town.id);
@@ -38,12 +55,20 @@ fs.mkdirSync(out, {recursive: true});
 fs.cpSync(web, out, {recursive: true, filter(source) {
   const relative = path.relative(web, source).split(path.sep);
   if (!relative[0]) return true;
+  if (relative[0] === 'assets') return relative.length === 1 || (relative.length === 2 && (welcomeAssets.has(relative[1]) || workspaceAssets.has(relative[1])));
   if (relative[0] !== 'presets') return relative.length === 1 && shellFiles.has(relative[0]);
   if (relative.length === 1 || relative[1] === 'catalog.json' || relative[1] === 'shared') return true;
   if (!townIds.has(relative[1])) return false;
-  return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]);
+  return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]) || relative[2] === 'setup-preview.jpg';
 }});
-fs.copyFileSync(path.join(web, 'library.html'), path.join(out, 'index.html'));
+fs.writeFileSync(path.join(out, 'index.html'), welcomeHtml);
+// Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.
+for (const file of ['index.html', 'library.html', 'workspace.html']) {
+  const target = path.join(out, file);
+  let html = fs.readFileSync(target, 'utf8').replace('<head>', '<head><meta name="utilitysim-hosted" content="true">');
+  if (file === 'library.html') html = html.replace('class="brand" href="/"', 'class="brand" href="/workspace.html"');
+  fs.writeFileSync(target, html);
+}
 fs.cpSync(path.join(repo, 'site'), path.join(out, 'download'), {recursive: true});
 fs.cpSync(path.join(repo, 'packages/town-viewer/dist/brand'), path.join(out, 'brand'), {recursive: true});
 fs.cpSync(path.join(repo, 'packages/town-viewer/dist/brand'), path.join(out, 'download/brand'), {recursive: true});

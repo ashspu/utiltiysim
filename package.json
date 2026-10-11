@@ -1,0 +1,15 @@
+{
+  "name": "utilitysim-shell",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:auth": "node --test tests/shell-auth/*.test.mjs",
+    "build": "node scripts/build_site.mjs"
+  },
+  "dependencies": {
+    "@upstash/redis": "1.39.0",
+    "@vercel/functions": "3.9.11",
+    "@workos-inc/node": "11.0.0",
+    "iron-session": "9.0.1"
+  }
+}

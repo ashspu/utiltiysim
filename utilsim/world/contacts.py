@@ -120,7 +120,9 @@ def _symptoms(db, day, meta):
 def daily(world, db, meta):
     if not enabled(db):
         return
-    day, policy = meta["through"], meta["contactPolicy"]
+    from .sentiment import contact_policy
+
+    day, base_policy = meta["through"], meta["contactPolicy"]
     finish = (date.fromisoformat(day)+timedelta(days=1)).isoformat()+"T00:00:00Z"
     changed = {}
     if "occupancyModelVersion" in meta:
@@ -128,6 +130,7 @@ def daily(world, db, meta):
     current = set()
     for (asset_id, condition), evidence in sorted(_symptoms(db, day, meta).items()):
         asset = dict(db.execute('SELECT * FROM assets WHERE id=?', (asset_id,)).fetchone())
+        policy = contact_policy(db, meta, asset['premise'], base_policy)
         profile = json.loads(asset['profile'])
         if not profile.get('occupied', True) or asset['installed'] > day:
             continue

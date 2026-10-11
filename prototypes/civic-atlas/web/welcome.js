@@ -8,38 +8,42 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const compact = matchMedia('(max-width: 760px)');
 const chapters = [...document.querySelectorAll('[data-story-chapter]')];
 const scenes = [...document.querySelectorAll('[data-story-scene]')];
-const jumps = [...document.querySelectorAll('[data-story-jump]')];
+const jumps = [...document.querySelectorAll('[data-story-jump], [data-story-step]')];
 const story = document.querySelector('.welcome-story');
 let frame = 0;
 let activeChapter = -1;
 
 function closeAccount(restoreFocus = false) {
+  if (!accountPanel || !accountButton) return;
   accountPanel.hidden = true;
   accountButton.setAttribute('aria-expanded', 'false');
   if (restoreFocus) accountButton.focus();
 }
-accountButton.addEventListener('click', () => {
+accountButton?.addEventListener('click', () => {
   const opening = accountPanel.hidden;
   accountPanel.hidden = !opening;
   accountButton.setAttribute('aria-expanded', String(opening));
 });
-accountButton.addEventListener('keydown', event => {
+accountButton?.addEventListener('keydown', event => {
   if (event.key === 'ArrowDown') {
     event.preventDefault();
     accountPanel.hidden = false;
     accountButton.setAttribute('aria-expanded', 'true');
-    accountPanel.querySelector('button').focus();
+    accountPanel.querySelector('button, a').focus();
   }
 });
-account.addEventListener('focusout', event => {
+account?.addEventListener('focusout', event => {
   if (!account.contains(event.relatedTarget)) closeAccount();
 });
 document.addEventListener('click', event => {
-  if (!account.contains(event.target)) closeAccount();
+  if (account && !account.contains(event.target)) closeAccount();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !accountPanel.hidden) closeAccount(true);
+  if (event.key === 'Escape' && accountPanel && !accountPanel.hidden) closeAccount(true);
 });
+// The offline prototype explains its unconfigured account. Hosted entry replaces
+// that dialog with WorkOS links but shares this disclosure and scroll narrative.
+if (signInDialog) {
 document.querySelector('#welcome-sign-in').addEventListener('click', () => {
   closeAccount();
   signInDialog.showModal();
@@ -54,6 +58,7 @@ signInDialog.addEventListener('click', event => {
   const rect = signInDialog.getBoundingClientRect();
   if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) signInDialog.close();
 });
+}
 
 function selectChapter(index) {
   if (activeChapter === index) return;
@@ -87,7 +92,7 @@ function updateStory() {
 function scheduleStory() {
   if (!frame) frame = requestAnimationFrame(updateStory);
 }
-jumps.forEach((jump, i) => jump.addEventListener('click', () => {
+jumps.filter(jump => jump.hasAttribute('data-story-jump')).forEach((jump, i) => jump.addEventListener('click', () => {
   chapters[i].scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'instant' : 'smooth' });
   chapters[i].focus({ preventScroll: true });
   selectChapter(i);
@@ -99,7 +104,7 @@ compact.addEventListener('change', scheduleStory);
 new MutationObserver(() => {
   if (document.body.dataset.view !== 'welcome') {
     closeAccount();
-    if (signInDialog.open) signInDialog.close();
+    if (signInDialog?.open) signInDialog.close();
   }
   scheduleStory();
 }).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
