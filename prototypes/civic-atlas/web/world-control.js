@@ -1,6 +1,6 @@
 import { addDays, dateValue, AdvanceController } from './world-control-core.mjs';
 import { createStormPanel } from './world-control-events.mjs';
-import { createSentimentPanel, commandPanelsLocked } from './world-control-sentiment.mjs';
+import { createSentimentPanel, commandPanelsLocked, coordinateCommandPanels } from './world-control-sentiment.mjs';
 import { readSession } from './shell-session.js';
 const $ = id => document.getElementById(id);
 let status = null, offset = 0, total = 0, reading = false;
@@ -25,8 +25,7 @@ function controls() {
   $('open').disabled = reading || controller.busy || events.locked || sentiment.locked;
   $('world').disabled = reading || controller.busy || events.locked || sentiment.locked;
   $('refresh').disabled = reading || controller.busy || events.locked || sentiment.locked;
-  events.setClockBusy(reading || controller.busy || controller.uncertain || sentiment.locked);
-  sentiment.setClockBusy(reading || controller.busy || controller.uncertain || events.locked);
+  coordinateCommandPanels(events,sentiment,reading || controller.busy || controller.uncertain);
 }
 function render(value) {
   // Never show a previously selected world's state beneath another identity.

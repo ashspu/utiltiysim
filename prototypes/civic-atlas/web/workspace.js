@@ -1,6 +1,6 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
 import { renderPhysicalSliderForm, configurationFormSchema, upgradePhysicalConfiguration, physicalFields, getPath, physicalChoiceLabel } from './physical-slider-form.mjs';
-import { initializationProgress, retainCreationResult } from './workspace-start-state.mjs';
+import { initializationProgress, retainCreationResult, completedStartMatches } from './workspace-start-state.mjs';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
 const isOwner = () => session.grants.some(g => g.role === 'owner');
@@ -95,7 +95,7 @@ async function openLibrary() {
   try{const {setups}=await api('/api/setups');if(!list.isConnected)return;list.removeAttribute('role');list.innerHTML=setups.length?setups.map(s=>`<article class="saved-setup"><span class="eyebrow">SAVED STARTING CONDITIONS</span><h3>${esc(s.name)}</h3><p>${esc(sourceFor(s.sourceId)?.name||s.sourceId)} · starts ${esc(s.start)}</p><small>Saved ${esc(new Date(s.updatedAt).toLocaleString())}</small><div class="saved-setup-actions"><button data-open-setup="${esc(s.id)}">Review setup →</button>${canStart(s)?`<button class="primary" data-start-setup="${esc(s.id)}">Start simulation</button>`:''}</div><p class="start-feedback" role="status"></p></article>`).join(''):'<p>No online setups saved yet. Create a world to choose its starting conditions.</p>';list.querySelectorAll('[data-open-setup]').forEach(b=>b.onclick=()=>{const saved=setups.find(s=>s.id===b.dataset.openSetup),source=sourceFor(saved.sourceId);if(!source||!source.canConfigure||source.sourceRevision!==saved.sourceRevision){message('This saved setup uses an unavailable map revision. Its values have been preserved; migration is required before editing.');return;}draft=structuredClone(saved);dirty=false;saveCommand=null;configure();});
     list.querySelectorAll('[data-start-setup]').forEach(button=>{
       const setup=setups.find(s=>s.id===button.dataset.startSetup),feedback=button.closest('article').querySelector('.start-feedback');
-      try { const pending=readStart(setup); if(pending?.worldId){showStarted(button,feedback,pending.worldId);return;} if(pending){button.textContent=pending.pendingWorldId?'Continue setup':'Retry original start';feedback.textContent=pending.pendingWorldId?`This physical world is still initializing. ${initializationProgress(pending)} Continue runs the next bounded setup batch with the original saved conditions.`:'A previous start has not been confirmed. Retry uses its original saved conditions.';} }
+      try { const pending=readStart(setup); if(completedStartMatches(pending,setup)){showStarted(button,feedback,pending.worldId);return;} if(pending?.worldId){showStartChoice(setup,button,feedback,pending);}else if(pending){button.textContent=pending.pendingWorldId?'Continue setup':'Retry original start';feedback.textContent=pending.pendingWorldId?`This physical world is still initializing. ${initializationProgress(pending)} Continue runs the next bounded setup batch with the original saved conditions.`:'A previous start has not been confirmed. Retry uses its original saved conditions.';} }
       catch(error){button.disabled=true;feedback.textContent=error.message;return;}
       button.onclick=()=>startSetup(setup,button,feedback,runtime);
     });
@@ -108,12 +108,19 @@ function showStarted(button,feedback,id) {
   button.disabled=true;button.textContent='Simulation started';
   feedback.innerHTML=`<a href="${href}">Open simulation →</a><br>Its initial settings are fixed. Editing the saved setup does not change this world.`;
 }
+function showStartChoice(setup,button,feedback,record){
+  if(completedStartMatches(record,setup)){showStarted(button,feedback,record.worldId);return;}
+  button.disabled=false;button.textContent='Start new simulation from updated setup';
+  const previous=worldLink(record.worldId);
+  feedback.innerHTML=`${previous?`<a href="${previous}">Open earlier simulation →</a><br>`:''}Starting again will create a separate simulation from this updated setup. The earlier simulation stays saved.`;
+}
 async function startSetup(setup,button,feedback,runtime) {
   if(!canStart(setup))return;
   button.disabled=true;feedback.textContent='Starting your simulation…';
   try {
     let record=readStart(setup);
-    if(record?.worldId){showStarted(button,feedback,record.worldId);return;}
+    if(completedStartMatches(record,setup)){showStarted(button,feedback,record.worldId);return;}
+    if(record?.worldId)record=null; // Only a completed earlier revision may start anew.
     if(!record){const {sourceId,sourceRevision,name,start,configuration}=setup;record={setupRevision:setup.revision,payload:{commandId:crypto.randomUUID(),sourceId,sourceRevision,name,start,configuration:structuredClone(configuration)}};}
     // Persist before sending. A lost response or reload must replay exactly this command and payload.
     sessionStorage.setItem(startKey(setup),JSON.stringify(record));
@@ -125,7 +132,7 @@ async function startSetup(setup,button,feedback,runtime) {
       if(runtime.isConnected)void loadWorlds(runtime);
       return;
     }
-    showStarted(button,feedback,world.id);
+    showStartChoice(setup,button,feedback,record);
     if(runtime.isConnected)void loadWorlds(runtime);
   }catch(error){feedback.textContent=`${error.message} The original start request is retained; retry it to recover the same simulation.`;button.disabled=false;button.textContent='Retry original start';}
 }

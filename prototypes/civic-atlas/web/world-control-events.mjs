@@ -2,7 +2,7 @@ import { addDays } from './world-control-core.mjs';
 const families = ['electric', 'gas', 'water', 'sewer'];
 function element(tag, text) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; return node; }
 export function createStormPanel(container, request, changed) {
-  let world, record, pending, busy = false, clockBusy = false, key, storageReady = true;
+  let world, record, pending, busy = false, clockBusy = false, otherPending = false, key, storageReady = true;
   let dayCursor, eventCursor, journalCursor;
   const notice = element('p'); notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
   const form = element('form'), fields = element('fieldset'); fields.append(element('legend', 'Schedule temperature and infrastructure stress'));
@@ -22,7 +22,7 @@ export function createStormPanel(container, request, changed) {
   const schedules = element('div'), history = element('div'), journal = element('div');
   const olderEvents = element('button', 'Older schedules'), olderDays = element('button', 'Older storm outcomes'), olderJournal = element('button', 'Older physical events');
   function controls() {
-    fields.disabled = busy || clockBusy || !!pending || !record || !storageReady;
+    fields.disabled = busy || clockBusy || otherPending || !!pending || !record || !storageReady;
     retry.hidden = !pending; retry.disabled = busy || clockBusy;
     refresh.disabled = busy || clockBusy || !!pending;
     container.querySelectorAll('[data-cancel]').forEach(button => { button.disabled = fields.disabled; });
@@ -69,7 +69,7 @@ export function createStormPanel(container, request, changed) {
     return { commandId: crypto.randomUUID(), expectedRevision: record.revision, effectiveDate: record.through, action, reason: inputs.reason.value.trim(), causalReference: 'hosted-world-controls' };
   }
   async function send(command) {
-    if (busy || clockBusy) return;
+    if (busy || clockBusy || (otherPending && !pending)) return;
     try {
       if (!pending) {
         try { sessionStorage.setItem(key, JSON.stringify(command)); }
@@ -98,6 +98,8 @@ export function createStormPanel(container, request, changed) {
   retry.onclick = () => send(); refresh.onclick = () => page('latest'); olderEvents.onclick = () => page('schedules'); olderDays.onclick = () => page('days'); olderJournal.onclick = () => page('journal');
   return {
     get locked() { return busy || !!pending; },
+    get busy() { return busy; },
+    setOtherPending(value) { otherPending=value; controls(); },
     setClockBusy(value) { clockBusy = value; controls(); },
     clear() { world = record = pending = null; inputs.start.value = inputs.end.value = ''; container.replaceChildren(element('p', 'Open a saved simulation to inspect its supported physical events.')); },
     async load(value) {

@@ -1,3 +1,4 @@
+export const completedStartMatches=(record,setup)=>!!record?.worldId&&record.setupRevision===setup.revision;
 export function initializationProgress(record) {
   if (!Number.isInteger(record.appliedCommands) || record.appliedCommands < 0) return '';
   return Number.isInteger(record.totalCommands) && record.totalCommands >= record.appliedCommands

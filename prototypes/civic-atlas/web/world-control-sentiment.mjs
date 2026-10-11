@@ -1,5 +1,9 @@
 import { addDays } from './world-control-core.mjs';
 export const commandPanelsLocked=(...panels)=>panels.some(panel=>panel.locked);
+export function coordinateCommandPanels(storm,news,clockBusy=false){
+  storm.setClockBusy(clockBusy||news.busy);news.setClockBusy(clockBusy||storm.busy);
+  storm.setOtherPending(news.locked);news.setOtherPending(storm.locked);
+}
 export class NewsCommandState {
   constructor(account,world,storage){if(!account)throw new Error('Sign in to retain news commands.');this.key=`utilitysim:news:${account}:${world}`;this.storage=storage;this.pending=JSON.parse(storage.getItem(this.key)||'null');this.busy=false;}
   get locked(){return this.busy||!!this.pending;}
@@ -14,7 +18,7 @@ export class NewsCommandState {
 }
 const make=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
 export function createSentimentPanel(container,request,changed,accountPromise){
-  let world,record,state,busy=false,clockBusy=false,dateCursor,newsCursor;
+  let world,record,state,busy=false,clockBusy=false,otherPending=false,dateCursor,newsCursor;
   const notice=make('p');notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');
   const summary=make('p'),form=make('form'),fields=make('fieldset');fields.append(make('legend','Schedule public confidence news'));
   const inputs={};
@@ -24,7 +28,7 @@ export function createSentimentPanel(container,request,changed,accountPromise){
   const submit=make('button','Schedule news');submit.type='submit';fields.append(submit);form.append(fields);
   const retry=make('button','Retry retained news command'),refresh=make('button','Latest confidence history'),olderDays=make('button','Older confidence days'),olderNews=make('button','Older news');
   const news=make('div'),history=make('div');
-  function controls(){fields.disabled=clockBusy||busy||state?.locked||!record?.enabled||!state;retry.hidden=!state?.pending;retry.disabled=clockBusy||busy;refresh.disabled=clockBusy||busy||!!state?.pending;olderDays.disabled=refresh.disabled||!record?.nextBefore;olderNews.disabled=refresh.disabled||!record?.nextNewsBefore;container.querySelectorAll('[data-news-cancel]').forEach(button=>button.disabled=fields.disabled);}
+  function controls(){fields.disabled=clockBusy||busy||otherPending||state?.locked||!record?.enabled||!state;retry.hidden=!state?.pending;retry.disabled=clockBusy||busy;refresh.disabled=clockBusy||busy||!!state?.pending;olderDays.disabled=refresh.disabled||!record?.nextBefore;olderNews.disabled=refresh.disabled||!record?.nextNewsBefore;container.querySelectorAll('[data-news-cancel]').forEach(button=>button.disabled=fields.disabled);}
   function mount(){container.replaceChildren(notice,summary,make('p','Manually entered scenario news changes community confidence; this is not a live news feed. Contact amplification requires separately enabled customer contacts and a real experienced service symptom.'),form,retry,refresh,make('h3','Scheduled and historical news'),news,olderNews,make('h3','Daily confidence history'),history,olderDays);}
   async function inspect(){
     const next=await request('sentiment',{id:world.id,limit:'25',...(dateCursor?{before:dateCursor}:{}),...(newsCursor?{newsBefore:String(newsCursor)}:{})});
@@ -40,7 +44,7 @@ export function createSentimentPanel(container,request,changed,accountPromise){
     controls();
   }
   function base(action){if(!inputs.reason.value.trim()){inputs.reason.focus();throw new Error('Enter a reason before recording a news command.');}return{commandId:crypto.randomUUID(),expectedRevision:record.revision,effectiveDate:record.through,action,reason:inputs.reason.value.trim(),causalReference:'hosted-confidence-controls'};}
-  async function send(command){if(busy||clockBusy||!state)return;busy=true;controls();changed();
+  async function send(command){if(busy||clockBusy||!state||(otherPending&&!state.pending))return;busy=true;controls();changed();
     try{await state.send(command,payload=>request('sentiment',{id:world.id},payload));dateCursor=newsCursor=null;await inspect();notice.textContent='News command recorded. Scheduled effects apply only when physical time advances.';}
     catch(error){notice.textContent=`${error.message}${state.pending?' Outcome uncertain; retry the retained exact command before advancing.':' Refresh history before another edit.'}`;}
     finally{busy=false;controls();changed();}}
@@ -48,5 +52,5 @@ export function createSentimentPanel(container,request,changed,accountPromise){
   retry.onclick=()=>send();
   async function page(kind){if(busy||clockBusy||state?.pending)return;busy=true;controls();changed();try{if(kind==='date')dateCursor=record.nextBefore;else if(kind==='news')newsCursor=record.nextNewsBefore;else dateCursor=newsCursor=null;await inspect();}catch(error){notice.textContent=error.message;}finally{busy=false;controls();changed();}}
   refresh.onclick=()=>page('latest');olderDays.onclick=()=>page('date');olderNews.onclick=()=>page('news');
-  return{get locked(){return busy||!!state?.locked;},get busy(){return busy;},setClockBusy(value){clockBusy=value;controls();},clear(){world=record=state=null;dateCursor=newsCursor=null;inputs.date.value='';summary.textContent='';news.replaceChildren();history.replaceChildren();container.replaceChildren(make('p','Open a saved world to inspect confidence history.'));},async load(value){world=value;record=null;dateCursor=newsCursor=null;mount();try{state=new NewsCommandState(await accountPromise,value.id,sessionStorage);await inspect();notice.textContent=state.pending?'A retained news command needs an exact retry before advancing.':'Review the date and confidence effect before scheduling.';}catch(error){notice.textContent=`Confidence controls unavailable: ${error.message}`;}controls();changed();}};
+  return{get locked(){return busy||!!state?.locked;},get busy(){return busy;},setOtherPending(value){otherPending=value;controls();},setClockBusy(value){clockBusy=value;controls();},clear(){world=record=state=null;dateCursor=newsCursor=null;inputs.date.value='';summary.textContent='';news.replaceChildren();history.replaceChildren();container.replaceChildren(make('p','Open a saved world to inspect confidence history.'));},async load(value){world=value;record=null;dateCursor=newsCursor=null;mount();try{state=new NewsCommandState(await accountPromise,value.id,sessionStorage);await inspect();notice.textContent=state.pending?'A retained news command needs an exact retry before advancing.':'Review the date and confidence effect before scheduling.';}catch(error){notice.textContent=`Confidence controls unavailable: ${error.message}`;}controls();changed();}};
 }
