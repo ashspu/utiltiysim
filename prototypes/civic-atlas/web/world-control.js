@@ -2,6 +2,7 @@ import { addDays, dateValue, AdvanceController } from './world-control-core.mjs'
 import { createStormPanel } from './world-control-events.mjs';
 const $ = id => document.getElementById(id);
 let status = null, offset = 0, total = 0, reading = false;
+const catalogSources = fetch('/api/setups?view=catalog',{cache:'no-store'}).then(async response => response.ok ? (await response.json()).sources : []).catch(()=>[]);
 async function request(action, params = {}, body) {
   const response = await fetch(`/api/compute?${new URLSearchParams({ action, ...params })}`, {
     method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
@@ -26,7 +27,18 @@ function controls() {
 function render(value) {
   // Never show a previously selected world's state beneath another identity.
   status = value;
+  $('world-map').hidden = true;
+  if(value) void catalogSources.then(sources=>{
+    const source=sources.find(source=>source.id===value.sourceId&&source.sourceRevision===value.sourceRevision&&source.snapshotSha256===value.snapshotSha256);
+    if(status?.id!==value.id||!source?.preview)return;
+    $('world-map-image').src=source.previewSmall||source.preview;
+    $('world-map-image').alt=`${source.name} · pinned town illustration`;
+    $('world-map-caption').textContent=`${source.name} · ${source.homes} homes · ${source.premises} premises. This illustration belongs to your saved world's map revision.`;
+    $('world-map').hidden=false;
+  });
   $('name').textContent = value?.name || 'Open a simulation';
+  const option=[...$('world').options].find(option=>option.value===value?.id);
+  if(option)option.textContent=`${value.name}${value.available?' · '+value.through:' · unavailable'}`;
   $('identity').textContent = value?.id || '—';
   $('revision').textContent = value?.sourceRevision || '—';
   $('state').textContent = value ? `${value.state || 'Unknown'}${value.available ? '' : ' · unavailable'}` : 'Unknown';
@@ -59,7 +71,7 @@ async function list() {
     for (const world of value.worlds) {
       if ([...$('world').options].some(option => option.value === world.id)) continue;
       const option = document.createElement('option'); option.value = world.id;
-      option.textContent = `${world.name} · ${world.id}${world.available ? '' : ' · unavailable'}`;
+      option.textContent = `${world.name}${world.available ? ' · '+world.through : ' · unavailable'}`;
       $('world').append(option);
     }
     $('more').hidden = offset >= total;

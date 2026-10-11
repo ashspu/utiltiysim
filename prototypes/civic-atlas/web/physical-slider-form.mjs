@@ -95,13 +95,14 @@ export function renderPhysicalSliderForm(container, schema, options = {}) {
     for (const [path, control] of controls) {
       const next = getPath(values, path), baseline = getPath(defaults, path), extent = sliderExtent(control.field, next);
       Object.assign(control.slider, { min: extent.min, max: extent.max, step: extent.step });
-      control.exact.step = extent.step;
+      control.exact.step = control.field.multipleOf ?? (control.field.type === 'integer' ? 1 : 'any');
       if (control.field.minimum !== undefined) control.exact.min = control.field.minimum;
       if (control.field.maximum !== undefined) control.exact.max = control.field.maximum;
       if (editingPath !== path) control.exact.value = Number.isFinite(next) ? next : '';
       if (Number.isFinite(next)) control.slider.value = next;
       const atDefault = Number.isFinite(next) && next === baseline;
       control.marker.textContent = baseline === undefined ? 'No server default supplied.' : `Default: ${baseline}${control.field['x-unit'] ? ` ${control.field['x-unit']}` : ''}${atDefault ? ' · current value' : ''}`;
+      if(Number.isFinite(next)&&Number.isFinite(baseline)&&!atDefault)control.marker.textContent+=next>baseline?' · above preset':' · below preset';
       const position = baseline === undefined ? null : Math.max(0, Math.min(100, 100 * (baseline - extent.min) / (extent.max - extent.min)));
       control.slider.style.setProperty('--default-position', position === null ? '0%' : `${position}%`);
       control.slider.dataset.hasDefault = String(position !== null);

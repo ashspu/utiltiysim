@@ -16,7 +16,7 @@ test('only introduction assets and independently protected API handlers bypass t
   for(const path of ['/','/index.html','/landing.js','/welcome.css','/assets/lantern-harbour-welcome.webp','/assets/lantern-harbour-welcome-small.webp','/brand/utility-studio-icon-color.svg','/api/auth/login','/atlas/api/state','/api/runtime']) {
     const result=await run(request(path));assert.equal(result.headers.get('x-middleware-next'),'1',path);
   }
-  for(const path of ['/workspace.html','/library.html?town=town-a','/viewer/','/presets/shared/tiled-map.html?preset=town-a']) {
+  for(const path of ['/workspace.html','/compute-connection.html','/world-control.html','/library.html?town=town-a','/viewer/','/presets/shared/tiled-map.html?preset=town-a']) {
     const result=await run(request(path));assert.equal(result.status,303,path);assert.match(result.headers.get('location'),/^\/api\/auth\/login\?/);assert.equal(result.headers.get('x-middleware-next'),null);
   }
   for(const path of ['/presets/catalog.json','/presets/town-a/premise-index.json','/presets/town-a/tiles/1-1.json','/library.js']) assert.equal((await run(request(path))).status,401,path);
@@ -42,6 +42,13 @@ test('entry never chooses a default town and rejects ambiguous town requests',as
   for(const path of ['/library.html','/presets/shared/tiled-map.html']) assert.equal((await run(request(path,'valid'))).headers.get('location'),'/workspace.html');
   for(const path of ['/library.html?town=town-a&town=town-b','/library.html?town=../private','/presets/shared/tiled-map.html?preset=bad%2Ftown']) assert.equal((await run(request(path,'valid'))).status,400,path);
   assert.equal((await run(request('/workspace.html','valid','POST'))).status,405);
+});
+test('compute settings are owner-only while world controls require workspace grants',async()=>{
+  const run=gate();
+  for(const path of ['/compute-connection.html','/compute-connection.js','/compute-connection.css'])assert.equal((await run(request(path,'valid'))).status,403);
+  assert.equal((await run(request('/world-control.html','valid'))).headers.get('x-middleware-next'),'1');
+  assert.equal((await gate({granted:false})(request('/world-control.html','valid'))).status,403);
+  assert.equal((await run(request('/api/compute?action=connection',undefined,'POST'))).headers.get('x-middleware-next'),'1');
 });
 test('missing auth configuration fails closed for protected files',async()=>{
   const run=createPageAccess({env:{}});

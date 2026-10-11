@@ -1,5 +1,5 @@
 import { readSession, signOut, loginUrl, escapeHtml as esc } from './shell-session.js';
-import { renderSchemaForm } from '/viewer/schema-form.js';
+import { renderPhysicalSliderForm } from './physical-slider-form.mjs';
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
 const isOwner = () => session.grants.some(g => g.role === 'owner');
@@ -52,8 +52,8 @@ function configure() {
   root.querySelector('#workspace-back').onclick=home;
   root.querySelector('#change-town').onclick=()=>{if(mayLeave()){dirty=false;draft=null;chooseTown();}};
   for(const [id,key] of [['world-name','name'],['world-start','start']])root.querySelector('#'+id).oninput=e=>{draft[key]=e.target.value;markDirty();};
-  form=renderSchemaForm(root.querySelector('#physical-settings'),catalog.configuration.schemas.world,{values:draft.configuration.world,base:catalog.configuration.defaults.world,showAdvanced:true,baseLabel:'Default',onChange:()=>{draft.configuration.world=structuredClone(form.values);markDirty();}});
-  root.querySelector('#setup-form').onsubmit=e=>{e.preventDefault();if(form.invalid()||!e.target.reportValidity())return;draft.configuration.world=structuredClone(form.values);review();};
+  form=renderPhysicalSliderForm(root.querySelector('#physical-settings'),catalog.configuration.schemas.world,{values:draft.configuration.world,defaults:catalog.configuration.defaults.world,onChange:values=>{draft.configuration.world=values;markDirty();}});
+  root.querySelector('#setup-form').onsubmit=e=>{e.preventDefault();if(form.validate().length||!e.target.reportValidity())return;draft.configuration.world=form.values;review();};
 }
 function review() {
   const source=sourceFor(draft.sourceId),schema=catalog.configuration.schemas.world;

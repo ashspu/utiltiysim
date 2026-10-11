@@ -4,11 +4,22 @@ Decision date: 11 October 2026. Owner: UtilitySim coordinator, Codex chat `01a12
 
 ## Product boundary
 
-UtilitySim owns the physical world: fixed preset geography and population, buildings and occupancy, physical equipment/networks, weather and demand, meter condition, physical events and repair outcomes, time/history, and observations. Virtual Systems owns enterprise accounts/contracts/tariffs, read validation and estimates, exceptions/work orders, operational staffing and queues, billing/receivables, collections and customer-service decisions. Physical visits and effects remain distinct from enterprise assignments and claimed reports. See [WORLD_V2](WORLD_V2.md) and [shell design](CIVIC_ATLAS_SHELL_DESIGN.md).
+UtilitySim owns the physical world: fixed preset geography and population sizes, buildings and occupancy, physical equipment/networks, weather and demand, meter condition, physical events and repair outcomes, time/history, and observations. Greg clarified that AMI/AMR/manual mix, reading/transmission behavior, housing age, customer behavior and household finances also belong in the world builder. Classify fields by their modeled effect, not by an old “Operations” heading. Virtual Systems owns enterprise staffing, processing throughput, queues, tariffs, billing/receivables, collections and operational decision policies. Physical visits and effects remain distinct from enterprise assignments and claimed reports. See [WORLD_V2](WORLD_V2.md) and [shell design](CIVIC_ATLAS_SHELL_DESIGN.md).
 
 The old offline Studio wizard mixed these domains. Port its useful controls and guided progression, not its enterprise features or procedural regeneration path. A map template, saved setup, and instantiated simulation are three different records. An online setup is not a running world. Never interpret a static catalog or browser localStorage as a cloud simulation library.
 
 ## Current evidence
+
+### Approved implementation update, 11 October
+
+- Greg approved proceeding with GPT-6.1 Sol parallel agents. Ash will configure the compute endpoint and credential in UtilitySim; no compute host is being provisioned on his behalf.
+- The corrected full-map Harbour hero, original ecosystem diagram and authenticated setup entry are live. Independent canonical desktop/mobile checks passed. Draft save verification found a legacy Redis URL pointing to a website; a dedicated `utilitysim-setup-store` was then provisioned on the existing Vercel Upstash integration, free plan, automatic upgrades and eviction disabled. Cloud save/reload remains a release acceptance check until recorded as passed.
+- The configurable compute gateway, persistent Python runtime, real instance library and independent event/time controls are implemented in the integration branch. They require integrated acceptance; local implementation is not hosted compute.
+- Other map production **must wait for Ashtown to be completed and independently reviewed**, with an accepted lessons handoff. Preparation/checklists may proceed. See [preset gates](PRESET_ROLLOUT_GATES.md); current fleet gate is blocked.
+- The five weather/meter fields are an initial adapter, not the final wizard scope. Bring physical/customer assumptions online through tested instance overlays while keeping roads, parcels, population sizes and stable identities fixed. Backend support gaps are implementation work, not reasons to exclude requested world settings.
+- Use sliders plus exact numeric entry, preset/default markers, and plain-language effect/severity labels. Use descriptive labels for age/technology distributions. Linked AMI/AMR/manual shares must total 100%. Unsupported fields must not imply a simulated effect.
+
+The following original checkpoint is retained for context; the dated update above supersedes its release status.
 
 - WorkOS login and Vercel shell are live; hosted compute remains unconnected. Existing offline worlds must be preserved.
 - Whole-map Lantern Harbour hero and original ecosystem diagram are being integrated by the shell owner; they are not yet released at this decision checkpoint.

@@ -13,20 +13,37 @@
                 "type": "number",
                 "title": "Winter average",
                 "default": 2.0,
-                "x-unit": "\u00b0C"
+                "x-unit": "°C",
+                "x-effect": "Sets the winter end of the seasonal daily temperature curve.",
+                "x-slider": {
+                  "min": -20,
+                  "max": 40
+                },
+                "x-step": 0.1
               },
               "summer_mean_c": {
                 "type": "number",
                 "title": "Summer average",
                 "default": 26.0,
-                "x-unit": "\u00b0C"
+                "x-unit": "°C",
+                "x-effect": "Sets the summer end of the seasonal daily temperature curve.",
+                "x-slider": {
+                  "min": -20,
+                  "max": 50
+                },
+                "x-step": 0.1
               },
               "daily_weather_spread_c": {
                 "type": "number",
                 "title": "Daily variation",
                 "default": 6.0,
-                "x-unit": "\u00b0C",
-                "minimum": 0
+                "x-unit": "°C",
+                "minimum": 0,
+                "x-effect": "Controls how much daily temperature varies around the seasonal curve. Higher values mean more variable weather.",
+                "x-slider": {
+                  "max": 20
+                },
+                "x-step": 0.1
               }
             }
           },
@@ -40,7 +57,9 @@
                 "default": 0.015,
                 "x-unit": "",
                 "minimum": 0,
-                "maximum": 1
+                "maximum": 1,
+                "x-effect": "Annual baseline chance used by the physical meter failure model. Higher values increase failure risk. 0.015 means 1.5%.",
+                "x-step": 0.001
               },
               "annual_meter_drift": {
                 "type": "number",
@@ -48,7 +67,9 @@
                 "default": 0.01,
                 "x-unit": "",
                 "minimum": 0,
-                "maximum": 1
+                "maximum": 1,
+                "x-effect": "Annual probability used for physical meter drift onset. Higher values increase drift risk. 0.01 means 1%.",
+                "x-step": 0.001
               }
             }
           }
@@ -93,7 +114,7 @@
       "status": "development-only",
       "preview": "/presets/ashtown-5000/setup-preview.jpg",
       "description": "Six illustrated zoning regions; property alignment is being rebuilt.",
-      "previewLabel": "Generated zoning preview \u00b7 Ashtown rebuild in progress",
+      "previewLabel": "Generated zoning preview · Ashtown rebuild in progress",
       "canConfigure": false,
       "grantTownId": "ashtown-5000"
     }
