@@ -75,7 +75,7 @@ Manual advancement and storm mutation use the existing cruise lock and reject wo
 
 ## Physical setup v2: supported customer policies
 
-GET source configuration now advertises `configurationVersion:'physical-setup/2'`, `schemas.world`, `schemas.physical`, and complete `defaults` including schemaVersion. Old `{world:...}` creation payloads remain valid and preserve their behavior. Extended configurations require `{schemaVersion:'physical-setup/2',world:{...},physical:{...}}`; missing fields normalize to defaults. Unknown groups, unsupported versions, wrong types/ranges and cashflow without finance are rejected before reserving a world. The new source artifact is `P:/UtilitySim/outputs/shell-workos/hosted-physical-setup-v2.json`.
+V2 introduced `configurationVersion:'physical-setup/2'`, `schemas.world`, `schemas.physical`, and complete `defaults` including schemaVersion. Old `{world:...}` creation payloads remain valid and preserve their behavior. V2 configurations use `{schemaVersion:'physical-setup/2',world:{...},physical:{...}}`; missing fields normalize to defaults. Unknown groups, unsupported versions, wrong types/ranges and cashflow without finance are rejected before reserving a world. The v2 source artifact is `P:/UtilitySim/outputs/shell-workos/hosted-physical-setup-v2.json`. The endpoint currently advertises the latest version documented below.
 
 Supported physical groups:
 
@@ -97,7 +97,7 @@ GET `/hosted/worlds/{id}/premises/{premise}/customer?before=YYYY-MM-DD&limit=25`
 
 ## Physical setup v3: meter collection and housing overlays
 
-`physical-setup/3` adds opt-in `meterChannels` and `housingAge` groups. V1 and v2 remain accepted and normalize to their original shapes; v2 retries do not acquire new defaults. The current source-configuration endpoint advertises v3. Do not relabel an existing v2 draft as v3 without explicitly upgrading its reviewed configuration. The independent shell-ready schema is `P:/UtilitySim/outputs/shell-workos/hosted-physical-setup-v3.json`.
+`physical-setup/3` adds opt-in `meterChannels` and `housingAge` groups. V1 and v2 remain accepted and normalize to their original shapes; v2 retries do not acquire new defaults. Do not relabel an existing v2 draft as v3 without explicitly upgrading its reviewed configuration. The independent shell-ready schema is `P:/UtilitySim/outputs/shell-workos/hosted-physical-setup-v3.json`.
 
 Meter fields: enabled, amiPercent/amrPercent/manualPercent (must total 100), amrReadIntervalDays/manualReadIntervalDays (1–366), and amiReadSuccess/amrReadSuccess/manualReadSuccess (0–1). Largest-remainder counts and stable seeded ordering assign starting meters to channels. AMI collects daily; AMR/manual collect on fixed intervals from world start or device commissioning. These schedules are scenario assumptions, not crew staffing or routing. No observations are fabricated on days without a scheduled collection. A successful read reports the accumulated device measurement over its complete interval. A missed collection reports an unknown quantity and retains private measured accumulation for a subsequent read; it never reads the truth table to repair a gap. Physical meter failure poisons that device's accumulated measurement; replacement starts a fresh interval/device. Existing observed-register reconstruction deliberately remains unknown after a reported gap. Its later recovery requires a separate physical-register contract and is not claimed here.
 
@@ -107,6 +107,40 @@ Housing fields: enabled, meanAgeYears and ageSpreadYears (0–200), extraThermal
 
 The source snapshot, geography and all stable IDs stay unchanged. `PhysicalProfilesConfigured` and a configuration digest record applied provenance. Premise inspection adds `physicalProfiles` with applied housing attributes, meter channels and aggregate channel counts; show these applied values over the source attributes when enabled. Both effects are opt-in and run in the existing atomic day transaction. Tests prove old daily behavior, deterministic assignment, true interval accumulation, missed-read recovery without a truth query, physical failure/replacement, rollback/restart and thermal-only demand changes. Full accepted-map HTTP proof covers all 1,262 meters, three-day manual intervals, 300 residential housing profiles, source preservation and process restart.
 
-## Implementation ownership
+## Physical setup v4: community and household sentiment
+
+The source-configuration endpoint currently advertises `physical-setup/4`, adding opt-in `customerSentiment`: enabled, initialTrust (0–100), recoveryDays (1–365), experienceImpact/lateBillImpact/communityInfluence (0–1), maxContactMultiplier (1–5). V1/v2/v3 remain accepted with their existing normalized shapes. Artifact: `P:/UtilitySim/outputs/shell-workos/hosted-physical-setup-v4.json`. Existing dated occupancy, hazard, fault and development modules still require hosted adapters; adding these groups does not claim the entire inventory is exposed.
+
+The model persists community frustration and a separate state for each starting residential household. Each day removes `priorFrustration / recoveryDays`, adds bounded influence from community mood, and applies at most one experienced-service and one late-delivered-bill impact. Actual experienced supply loss/visible overflow can affect mood; hidden fault existence and missing transmissions cannot. Financial evidence comes only from the trusted world inbox and its received invoice. A bill counts as late only when its actual delivery date is after its due date, and it is consumed once. Learning an on-time document late does not mislabel it as a late delivery. An unpaid or unreceived bill is not invented as evidence. Occupancy cohort changes reset personal memory; community mood can still influence the new household.
+
+Community mood receives explicit scheduled public-news impulses, household feedback and recovery. Every state stays in [0,1]. The current mean influences community mood, and public mood influences households, producing bounded amplification rather than unbounded growth. Coefficients are scenario assumptions, not calibrated predictions. Good news, quiet days and restored service allow confidence to recover.
+
+With the existing contact model enabled, personal frustration derives a multiplier from 1 to maxContactMultiplier. It raises notice probability (capped at 1), reduces repeat spacing (at least one day), and raises the episode contact cap (at most 10). Contact intentions still require a real experienced service symptom. News-only inquiries, financial-contact escalation, enterprise queue delays/staff handling and payment-propensity effects are not implemented in this slice. Existing contact envelope/schema, delivery timing and knowledge boundaries remain unchanged; sentiment and hidden causes stay in administrator history.
+
+GET `/hosted/worlds/{id}/events/sentiment?premiseId=<optional>&before=YYYY-MM-DD&newsBefore=<sequence>&limit=25` returns `{worldInstanceId,enabled,modelVersion,view,through,revision,policy,communityTrust,householdTrust,history,nextBefore,news,nextNewsBefore}` when enabled. Date cursor pages community or household history; independent integer cursor pages news, including multiple events on one date. Disabled worlds return enabled:false and no tables are created by reading. These are administrator-truth views, not recipient evidence.
+
+POST the same path to schedule a synthetic public-news scenario:
+
+```json
+{
+  "commandId": "a UUID",
+  "expectedRevision": 0,
+  "effectiveDate": "2026-07-15",
+  "action": "schedule",
+  "reason": "Public confidence scenario",
+  "causalReference": "reviewed-scenario",
+  "eventDate": "2026-07-16",
+  "trustChange": -30,
+  "headline": "Reliability concerns in local news"
+}
+```
+
+Positive trustChange improves confidence; negative values reduce it, bounded to −100…100 points. Schedule within the current day and next 3650 days. This is manually entered scenario news, not a live news feed. Cancel with action:cancel and newsId, omitting eventDate/trustChange/headline. Common fields remain required. The gateway supplies world identity and local administrator authority after principal/grant checks. Revision/date checks, exact retries, cancellation before processing and clock ownership match the storm adapter. Receipt: `{commandId,newsId,revision,eventId,status:'completed',modelVersion,effectiveDate}`. Initial sentiment must have been enabled. Applied/cancelled news cannot be cancelled again under a new command.
+
+Sentiment, contact decisions, news application and the physical day checkpoint commit atomically. Tests cover no future/hidden knowledge, late delivery versus late learning, bounds, restored/quiet recovery, cohort resets, unchanged opt-out physics/contact contracts, rollback/restart, event idempotency, cancellation, auth, immutable inspection and independent pagination. Full accepted-map HTTP/restart proof covers 300 occupied households and one exactly-once scheduled news impulse; separate real-fault tests prove actual repeat-contact amplification.
+
+## Current ownership
 
 Backend chat `01a12bf4-9f78-7411-ac48-15750ae1d151` owns `utilsim/hosted/`, its tests and `deploy/hosted-runtime/`. Shell chat `01a12acd-01bf-7801-b837-d651ab299083` owns UI, WorkOS gateway and canonical Vercel release. Coordinator `01a12759-bb9e-79b1-b1b9-32f0a5864e10` coordinates online draft storage. Standing coordination authorization: Greg, 2026-10-11, chat `01a12aa3-5c1e-7142-aad0-dd177c7c9f09`.
+
+Coordinator-approved narrow core expansion covers store.py, contacts.py, new physical_profiles.py/sentiment.py and focused tests. Existing finance/notices/enterprise/exchange/register modules were not modified. Preserve other workstream ownership when expanding this scope.

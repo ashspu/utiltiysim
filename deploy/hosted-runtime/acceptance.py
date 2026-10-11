@@ -26,6 +26,7 @@ def main():
     parser.add_argument('--report', required=True)
     parser.add_argument('--customer-setup', action='store_true')
     parser.add_argument('--physical-profiles', action='store_true')
+    parser.add_argument('--sentiment', action='store_true')
     args = parser.parse_args()
     package = Path(args.package)
     source_paths = [p for p in package.rglob('*') if p.is_file()]
@@ -94,6 +95,10 @@ def main():
                 meterChannels={'enabled': True, 'amiPercent': 0, 'amrPercent': 0, 'manualPercent': 100,
                                'manualReadIntervalDays': 3, 'manualReadSuccess': 1},
                 housingAge={'enabled': True, 'meanAgeYears': 100, 'ageSpreadYears': 0})
+        if args.sentiment:
+            value['configuration']['schemaVersion'] = 'physical-setup/4'
+            value['configuration'].setdefault('physical', {}).update(
+                customerSentiment={'enabled': True, 'initialTrust': 100, 'communityInfluence': 1})
         simulated_days = 3 if args.physical_profiles else 2
         target = '2026-07-18' if args.physical_profiles else '2026-07-17'
         started = time.monotonic()
@@ -122,6 +127,12 @@ def main():
         cancellation = {k: cancelled_storm[k] for k in ('effectiveDate', 'reason', 'causalReference')}
         cancellation.update(commandId=str(uuid.uuid4()), expectedRevision=2, action='cancel', stormId=cancelled_receipt['stormId'])
         call('POST', storm_path, json=cancellation)
+        if args.sentiment:
+            sentiment_path = base + '/events/sentiment'
+            news = {'commandId': str(uuid.uuid4()), 'expectedRevision': 0, 'effectiveDate': first['through'],
+                    'action': 'schedule', 'reason': 'Accepted-map public confidence scenario', 'causalReference': 'isolated-http-qa',
+                    'eventDate': '2026-07-16', 'trustChange': -60, 'headline': 'Utility reliability questioned in local news'}
+            news_receipt = call('POST', sentiment_path, json=news)
         advanced = call('POST', base + '/advance', json={'through': target})
         assert advanced['days'] == simulated_days and advanced['observations'] > 0
         assert call('GET', '/hosted/worlds/' + second['id'])['days'] == 0
@@ -166,7 +177,7 @@ def main():
             assert customer['finance']['cashCents'] == 10000 + 600 * simulated_days
             assert len(customer['cashflow']['history']) == simulated_days
             assert first['initialization']['eligibleHouseholds'] == 300
-            assert first['initialization']['appliedCommands'] == 601 + int(args.physical_profiles)
+            assert first['initialization']['appliedCommands'] == 601 + int(args.physical_profiles) + int(args.sentiment)
             customer_proof = {'initialization': first['initialization'], 'creationSeconds': creation_seconds,
                               'maxCreateRequestSeconds': max(setup_request_seconds), 'createRequestCount': len(setup_request_seconds),
                               'samplePremiseId': residential['premiseId'], 'startingCashCents': 10000,
@@ -190,6 +201,17 @@ def main():
                 'housingAgeYears': 100, 'intervalStart': '2026-07-15', 'intervalEnd': target,
                 'intervalReadings': len(reads), 'noUnscheduledDailyReadings': True,
                 'sampleWaterMatchesThreeDailyMeasurements': True, 'maxCreateRequestSeconds': max(setup_request_seconds)}
+        sentiment_proof = None
+        if args.sentiment:
+            mood = call('GET', sentiment_path)
+            assert 0 <= mood['communityTrust'] < 50
+            assert len(mood['history']) == simulated_days
+            assert call('POST', sentiment_path, json=news) == news_receipt
+            assert sum(bool(n['applied']) for n in mood['news']) == 1
+            assert all(r['payload']['occupiedHouseholds'] == 300 for r in mood['history'])
+            sentiment_proof = {'modelVersion': mood['modelVersion'], 'initialTrust': 100,
+                'resumedCommunityTrust': mood['communityTrust'], 'occupiedHouseholds': 300,
+                'appliedNewsEvents': 1, 'exactRetryAfterRestart': True, 'historyDays': len(mood['history'])}
         assert all(p.exists() and sha(p.read_bytes()) == before[str(p)] for p in source_paths)
         report = {'status': 'passed-local-only', 'sourceRevision': revision, 'sourceFilesUnchanged': len(source_paths),
                   'sourceWorldChecked': source_world.exists(), 'counts': first['counts'], 'independentWorldIds': [first['id'], second['id']],
@@ -197,6 +219,7 @@ def main():
                   'configurationRoundtrip': True, 'actualProcessRestart': True, 'idempotentCreate': True,
                   'customerSetup': customer_proof,
                   'physicalProfiles': profile_proof,
+                  'sentiment': sentiment_proof,
                   'principalIsolation': True, 'mapAndMeterBindingsExact': True, 'hostedDeployed': False,
                   'stormLoop': {'scheduled': True, 'cancelledBeforeStart': True, 'startedCancellationRejected': True,
                                 'exactRetryAfterRestart': True, 'appliedDays': len(storm_history['history']),

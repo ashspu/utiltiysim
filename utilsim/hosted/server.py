@@ -238,6 +238,20 @@ def create_app(root, token):
             raise ValueError('Provide only the desired through date.')
         return library.advance(row, value['through'])
 
+    @app.get('/hosted/worlds/{identity}/events/sentiment')
+    def sentiment_history(identity: str, request: Request, premiseId: str | None = None,
+                          before: str | None = None, limit: int = Query(25, ge=1, le=50),
+                          newsBefore: int | None = Query(None, ge=1, le=9223372036854775807)):
+        from utilsim.world import sentiment
+
+        owned(identity, request)
+        return {'worldInstanceId': identity,
+                **sentiment.inspect(library.library.world(identity), premiseId, before, limit, newsBefore)}
+
+    @app.post('/hosted/worlds/{identity}/events/sentiment')
+    def sentiment_action(identity: str, request: Request, value: dict = Depends(body)):
+        return library.sentiment_command(owned(identity, request, 'advance'), value)
+
     return app
 
 

@@ -124,6 +124,10 @@ def test_v2_remains_identical_and_v3_profiles_apply_without_changing_map(setup):
     old = client.post('/hosted/worlds', json=legacy, headers=headers()).json()
     assert set(old['configuration']['physical']) == {'customerContacts', 'householdFinance', 'householdCashflow'}
     assert TestClient(create_app(root, TOKEN)).post('/hosted/worlds', json=legacy, headers=headers()).json()['configuration'] == old['configuration']
+    legacy_v3 = {**legacy, 'commandId': str(uuid.uuid4()), 'configuration': {**legacy['configuration'], 'schemaVersion': 'physical-setup/3'}}
+    old_v3 = client.post('/hosted/worlds', json=legacy_v3, headers=headers()).json()
+    assert 'customerSentiment' not in old_v3['configuration']['physical']
+    assert TestClient(create_app(root, TOKEN)).post('/hosted/worlds', json=legacy_v3, headers=headers()).json()['configuration'] == old_v3['configuration']
     modern = {**value, 'commandId': str(uuid.uuid4()), 'configuration': {'schemaVersion': physical_setup.VERSION,
         'physical': {'meterChannels': {'enabled': True, 'amiPercent': 0, 'amrPercent': 0, 'manualPercent': 100,
                                        'manualReadIntervalDays': 2, 'manualReadSuccess': 1},

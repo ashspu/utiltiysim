@@ -9,11 +9,11 @@ from time import monotonic
 from jsonschema import Draft202012Validator
 
 from utilsim.config.wizard import world_configuration
-from utilsim.world import contacts, customer_cashflow, customer_finance, physical_profiles
+from utilsim.world import contacts, customer_cashflow, customer_finance, physical_profiles, sentiment
 from utilsim.world.store import canonical
 
-VERSION = 'physical-setup/3'
-SUPPORTED_VERSIONS = ('physical-setup/2', VERSION)
+VERSION = 'physical-setup/4'
+SUPPORTED_VERSIONS = ('physical-setup/2', 'physical-setup/3', VERSION)
 MAX_NEW_COMMANDS = 10
 MAX_BATCH_SECONDS = 8
 
@@ -110,6 +110,23 @@ def schema(version=VERSION):
                              ('housingAge', ['meanAgeYears', 'ageSpreadYears'])]:
         for key in keys:
             result['properties'][group_name]['properties'][key]['x-control']['severityBasis'] = 'descriptive'
+    if version == 'physical-setup/3':
+        return result
+    result['properties']['customerSentiment'] = group('Community confidence and customer sentiment', {
+        'enabled': {**active, 'title': 'Enable sentiment feedback'},
+        'initialTrust': number('Initial trust in the utility', 70, 0, 100, 1, 'trust points',
+            'Initial community and household confidence. Lower trust can amplify contact about an experienced problem.', ['Hostile', 'Trusting']),
+        'recoveryDays': number('Confidence recovery timescale', 30, 1, 365, 1, 'days',
+            'Each quiet day removes this fraction (1 / days) of frustration. This is gradual recovery, not a fixed expiry.', ['Faster recovery', 'Longer memory'], integer=True),
+        'experienceImpact': number('Impact of an experienced service problem', .08, 0, 1, .01, 'frustration fraction per day',
+            'Adds frustration on a day with experienced supply loss or visible overflow; hidden faults and missing readings do not count.', ['Lower impact', 'Higher impact']),
+        'lateBillImpact': number('Impact of a bill delivered after its due date', .1, 0, 1, .01, 'frustration fraction',
+            'Uses actually received invoice evidence once, capped at one impact per household per day. Does not create bills or infer unpaid bills.', ['Lower impact', 'Higher impact']),
+        'communityInfluence': number('Community influence on household mood', .05, 0, 1, .01, 'daily influence fraction',
+            'Couples household frustration and town mood; public news can spread through this bounded feedback.', ['More independent', 'Stronger shared reaction']),
+        'maxContactMultiplier': number('Maximum contact amplification', 2, 1, 5, .1, 'multiplier',
+            'Raises notice probability and the repeat-contact limit, and shortens repeat spacing for existing experienced problems. Probability stays at most 100%; repeats at most 10 per episode.', ['No amplification', 'More contact pressure']),
+    })
     return result
 
 
@@ -129,8 +146,10 @@ def normalize(supplied, version=VERSION):
         result[key].update(values)
     if result['householdCashflow']['enabled'] and not result['householdFinance']['enabled']:
         raise ValueError('Household cashflow requires household finance profiles.')
-    if version == VERSION:
+    if version != 'physical-setup/2':
         physical_profiles.validate(result['meterChannels'], result['housingAge'])
+    if version == VERSION:
+        sentiment.validate(result['customerSentiment'])
     return result
 
 
@@ -155,7 +174,9 @@ def presentation():
             'defaults': {'schemaVersion': VERSION, 'world': initial, 'physical': defaults()},
             'scope': {'householdPolicies': 'Uniform initial assumptions for occupied residential premises only',
                       'currency': 'Minor currency units; no currency conversion or enterprise tariff configuration',
-                      'unsupportedRequiredControls': ['customer sentiment feedback']}}
+                      'unsupportedRequiredControls': [],
+                      'otherEngineControlsPendingHostedAdapters': ['dated occupancy changes', 'infrastructure hazards', 'network and water faults', 'development'],
+                      'sentimentLimits': 'Amplifies experienced-service contacts only; financial-contact escalation and news-only inquiries are not yet modeled.'}}
 
 
 def apply(world, identity, configuration, bindings, snapshot, progress):
@@ -193,6 +214,8 @@ def apply(world, identity, configuration, bindings, snapshot, progress):
     total = int(physical['customerContacts']['active']) + len(eligible) * int(finance['enabled']) * (1 + int(flow['enabled']))
     profiles_enabled = any(physical.get(group, {}).get('enabled', False) for group in ('meterChannels', 'housingAge'))
     total += int(profiles_enabled)
+    sentiment_enabled = physical.get('customerSentiment', {}).get('enabled', False)
+    total += int(sentiment_enabled)
     try:
         if profiles_enabled:
             profile_command = str(uuid.uuid5(uuid.UUID(identity), 'physical-profiles:world'))
@@ -200,6 +223,17 @@ def apply(world, identity, configuration, bindings, snapshot, progress):
                                         [b['premiseId'] for b in bindings if b.get('premiseType') == 'residential'])
             completed += 1
             if profile_command not in prior_commands:
+                new_commands += 1
+                progress(completed)
+        if sentiment_enabled:
+            sentiment_command = str(uuid.uuid5(uuid.UUID(identity), 'customer-sentiment:world'))
+            if sentiment_command not in prior_commands and (new_commands >= MAX_NEW_COMMANDS or
+                    (new_commands and monotonic() - started >= MAX_BATCH_SECONDS)):
+                raise SetupBatchPending()
+            sentiment.configure(world, sentiment_command, physical['customerSentiment'],
+                                [b['premiseId'] for b in bindings if b.get('premiseType') == 'residential'])
+            completed += 1
+            if sentiment_command not in prior_commands:
                 new_commands += 1
                 progress(completed)
         if physical['customerContacts']['active']:

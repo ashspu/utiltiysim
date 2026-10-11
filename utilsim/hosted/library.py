@@ -11,7 +11,7 @@ from pathlib import Path
 from utilsim.config.wizard import world_configuration
 from utilsim.worker import world_creation
 from utilsim.worker.worlds import WorldLibrary
-from utilsim.world import cruise, storms
+from utilsim.world import cruise, sentiment, storms
 from utilsim.world.map_view import WorldMap
 from utilsim.world.store import MODEL_VERSION, World, canonical
 
@@ -183,7 +183,7 @@ class HostedLibrary:
                   'townId': manifest['townId'], 'grantTownId': manifest['grantTownId'], 'counts': manifest['counts'], 'snapshotSha256': manifest['snapshotSha256'],
                   'paths': {k: base + suffix for k, suffix in {'status': '', 'snapshot': '/map/snapshot',
                             'bindings': '/map/bindings', 'advance': '/advance', 'observations': '/observations',
-                            'events': '/events', 'storms': '/events/storms'}.items()},
+                            'events': '/events', 'storms': '/events/storms', 'sentiment': '/events/sentiment'}.items()},
                   'capabilities': {'stormEvents': storms.VERSION, 'advanceMode': 'synchronous', 'backgroundJobs': False},
                   'configurationRevision': 1, 'configurationEditable': False}
         with self.library.db() as db:
@@ -248,3 +248,18 @@ class HostedLibrary:
                        'environmentId': meta['environment'], 'worldFingerprint': meta['fingerprint'],
                        'actorId': 'world-admin'}
             return storms.command(world, payload)
+
+    def sentiment_command(self, row, value):
+        common = {'commandId', 'expectedRevision', 'effectiveDate', 'action', 'reason', 'causalReference'}
+        extra = {'schedule': {'eventDate', 'trustChange', 'headline'}, 'cancel': {'newsId'}}.get(value.get('action')) if isinstance(value.get('action'), str) else None
+        if extra is None or set(value) != common | extra:
+            raise ValueError('Provide only supported sentiment news schedule or cancellation fields.')
+        try:
+            identity = str(uuid.UUID(value['commandId']))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ValueError('A sentiment command UUID is required.') from exc
+        with self.manual_world(row) as world:
+            with world.read_db() as db:
+                meta = world.metadata(db)
+            return sentiment.command(world, {**value, 'commandId': identity, 'schemaVersion': sentiment.VERSION,
+                'environmentId': meta['environment'], 'worldFingerprint': meta['fingerprint'], 'actorId': 'world-admin'})

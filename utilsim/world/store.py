@@ -201,6 +201,7 @@ class World:
             occupancy,
             physical_profiles,
             registers,
+            sentiment,
             sewer,
             storms,
             water_faults,
@@ -270,6 +271,7 @@ class World:
                                (observation_id, a["id"], ds, a["device"], observed,
                                 "missing" if observed is None else "observed"))
                     registers.record(db, observation_id, a["device"], observed)
+                sentiment.daily(self, db, meta)
                 contacts.daily(self, db, meta)
                 customer_finance.daily(self, db, meta)
                 event = self.event(db, env, ds, "WorldDayCompleted", meta["town"], {"temperatureC": temperature})
