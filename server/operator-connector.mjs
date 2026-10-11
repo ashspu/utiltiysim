@@ -1,8 +1,15 @@
 import {fail} from './compute-connector.mjs';
+import {createHash} from 'node:crypto';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const id=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/;
 export const actions=Object.freeze({premise:[],job:['jobId'],'release-read':['commandId','exceptionId','note'],bill:['commandId','cycleId','contractId'],invoice:['commandId','cycleId','accountId'],'retry-job':['commandId','jobId']});
 export const readAction=action=>['premise','job'].includes(action);
+export function operatorRequestHash(value){const canonical=JSON.stringify(Object.fromEntries(Object.keys(value).sort().map(key=>[key,value[key]])));return createHash('sha256').update(canonical,'utf8').digest('hex');}
+export function publicOperatorRejection(value,request,marker,status){
+ const proof=value?.rejection,expectedStatus={'release-read':404,invoice:403,'retry-job':403}[request.action];
+ if(expectedStatus===undefined||status!==expectedStatus||value?.schemaVersion!=='connected-operator-response/1'||value.runId!==marker.runId||value.controllerId!==marker.controllerId||value.premiseId!==request.premiseId||value.action!==request.action||!proof||typeof proof!=='object'||Array.isArray(proof)||Object.keys(proof).length!==4||Object.keys(proof).some(key=>!['commandId','requestHash','status','disposition'].includes(key))||proof.commandId!==request.commandId||proof.status!==status||proof.disposition!=='permanently-rejected'||proof.requestHash!==operatorRequestHash(request))return null;
+ return {commandId:proof.commandId,requestHash:proof.requestHash,status,disposition:proof.disposition};
+}
 export function validateOperatorRequest(value) {
  if(!value||typeof value!=='object'||Array.isArray(value)||!Object.hasOwn(actions,value.action||''))fail(422,'Choose a supported commercial action.');
  const expected=['action','premiseId',...actions[value.action]];
@@ -26,9 +33,10 @@ function object(value){if(!value||typeof value!=='object'||Array.isArray(value))
 function project(value,allowed){object(value);const result={};for(const key of allowed)if(Object.hasOwn(value,key)){const item=value[key];if(item!==null&&!(typeof item==='string'&&item.length<=2000&&!/(?:https?:\/\/|Bearer\s)/i.test(item)||typeof item==='number'&&Number.isFinite(item)||typeof item==='boolean'))fail(502,'Invalid commercial field.');result[key]=item;}if(!id.test(result.id||''))fail(502,'Invalid commercial record identifier.');return result;}
 function rows(value,allowed){if(!Array.isArray(value)||value.length>200)fail(502,'Commercial collection exceeds its bound.');const result=value.map(row=>project(row,allowed));if(new Set(result.map(row=>row.id)).size!==result.length)fail(502,'Duplicate commercial record.');return result;}
 function requireRelation(value,known){if(!known.has(value))fail(502,'Commercial response contains a foreign record.');}
-function premiseResult(value,premiseId){object(value);if(value.physicalPremiseId!==premiseId||Object.keys(value).some(key=>!['physicalPremiseId',...Object.keys(fields)].includes(key)))fail(502,'Commercial premise was not confirmed.');const result={physicalPremiseId:premiseId};for(const [table,allowed]of Object.entries(fields))result[table]=rows(value[table],allowed);
+function premiseResult(value,premiseId){object(value);if(value.physicalPremiseId!==premiseId||Object.keys(value).some(key=>!['physicalPremiseId','invoiceEligibleAccountIds',...Object.keys(fields)].includes(key)))fail(502,'Commercial premise was not confirmed.');const result={physicalPremiseId:premiseId};for(const [table,allowed]of Object.entries(fields))result[table]=rows(value[table],allowed);
  if(!result.accounts.length||!result.premises.length||!result.contracts.length||!result.installations.length)fail(502,'Commercial premise mapping was not confirmed.');
  const sets=Object.fromEntries(Object.entries(fields).map(([table])=>[table,new Set(result[table].map(row=>row.id))]));
+ if(Object.hasOwn(value,'invoiceEligibleAccountIds')){const eligible=value.invoiceEligibleAccountIds;if(!Array.isArray(eligible)||eligible.length>200||new Set(eligible).size!==eligible.length||eligible.some(account=>typeof account!=='string'||!sets.accounts.has(account)))fail(502,'Invoice eligibility was not confirmed for this premise.');result.invoiceEligibleAccountIds=[...eligible];}
  for(const row of result.contracts){requireRelation(row.account_id,sets.accounts);requireRelation(row.installation_id,sets.installations);}
  for(const row of result.installations)requireRelation(row.premise_id,sets.premises);
  for(const row of result.reads)requireRelation(row.installation_id,sets.installations);

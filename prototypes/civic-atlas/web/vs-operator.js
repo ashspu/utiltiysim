@@ -9,7 +9,7 @@ function clearScope(){projection=job=null;jobId=null;for(const id of ['mapping',
 function safeError(error){return{401:'Sign in to view commercial records.',403:'Current commercial permission is required. No new changes are allowed.',404:'This premise or record is unmapped or outside your permitted scope. No commercial records were shown.',409:'The mapping or shared-run boundary could not be confirmed. No change is confirmed.',413:'This premise exceeds the bounded view. No records were silently omitted.'}[error?.status]||'Commercial records could not be confirmed. Preserve any retained request for an exact retry.';}
 async function operatorRequest(body){
   const response=await fetch(`/api/operator?id=${worldId}`,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!response.ok){const error=Error('Commercial request unconfirmed');error.status=response.status;throw error;}
+  if(!response.ok){const error=Error('Commercial request unconfirmed');error.status=response.status;try{error.rejection=(await response.json()).rejection;}catch{}throw error;}
   let value;try{value=await response.json();}catch{throw Error('Unconfirmed commercial response');}
   return validateOperatorResponse(value,body);
 }
@@ -24,6 +24,7 @@ function table(container,title,rows,columns){
 function validateProjection(value){
   const collections=['accounts','premises','contracts','installations','reads','bills','invoices','exceptions','cycles','receivables'];
   if(value?.physicalPremiseId!==premiseId||collections.some(key=>!Array.isArray(value[key])||value[key].some(row=>!safeOperatorId(row?.id))))throw Error('Premise scope was not confirmed');
+  if(value.invoiceEligibleAccountIds!==undefined&&(!Array.isArray(value.invoiceEligibleAccountIds)||value.invoiceEligibleAccountIds.length>200||new Set(value.invoiceEligibleAccountIds).size!==value.invoiceEligibleAccountIds.length||value.invoiceEligibleAccountIds.some(id=>!value.accounts.some(account=>account.id===id))))throw Error('Invoice eligibility was not confirmed');
   return value;
 }
 function renderProjection(value){
@@ -39,7 +40,8 @@ function renderProjection(value){
   table($('records'),'Receivables',value.receivables,[['id','Receivable'],['account_id','Account'],['original_minor','Original (minor units)'],['paid_minor','Paid (minor units)'],['written_off_minor','Written off (minor units)'],['open_minor','Open (minor units)'],['currency','Currency'],['status','Status']]);
   table($('exceptions'),'Actual open exceptions',value.exceptions,[['id','Exception'],['code','Code'],['read_id','Read'],['message','Reported reason'],['status','Status']]);
   const held=value.exceptions.filter(exception=>exception.status==='open'&&exception.code==='HIGH_CONSUMPTION'&&value.reads.some(read=>read.id===exception.read_id&&read.status==='held'&&(!read.source_read_id||value.reads.some(source=>source.id===read.source_read_id&&source.status==='accepted'))));
-  options('exception',held,row=>`${row.id} · ${row.code}`);options('contract',value.contracts,row=>row.id);options('account',value.accounts,row=>`${row.id} · ${row.name}`);
+  options('exception',held,row=>`${row.id} · ${row.code}`);options('contract',value.contracts,row=>row.id);options('account',value.accounts.filter(account=>value.invoiceEligibleAccountIds?.includes(account.id)),row=>`${row.id} · ${row.name}`);
+  $('invoice-eligibility').textContent=Array.isArray(value.invoiceEligibleAccountIds)?value.invoiceEligibleAccountIds.length?'Invoicing is available only for the eligible accounts reported for this premise.':'No mapped account is currently eligible for connected invoicing.':'Invoice eligibility was not reported. Invoicing remains disabled.';
   for(const id of ['bill-cycle','invoice-cycle'])options(id,value.cycles,row=>`${row.id} · ${row.label} · ${row.start} → ${row.end}`);
   $('note').maxLength=200;controls();
 }
@@ -47,7 +49,7 @@ function controls(){
   const permitted=canOperate(session,world?.grantTownId)&&session?.user?.id===commands?.actorId,locked=loading||mutating||!commands||commands.locked||!permitted||!projection;
   $('release-fields').disabled=locked||!$('exception').options.length;
   $('bill-fields').disabled=locked||!$('contract').options.length||!$('bill-cycle').options.length;
-  $('invoice-fields').disabled=locked||!$('account').options.length||!$('invoice-cycle').options.length;
+  $('invoice-fields').disabled=locked||!projection?.invoiceEligibleAccountIds?.includes($('account').value)||!$('account').options.length||!$('invoice-cycle').options.length;
   $('retry').hidden=!commands?.pending;$('retry').disabled=loading||mutating||!permitted||commands?.pending?.premiseId!==premiseId;
   $('refresh').disabled=loading||mutating;$('refresh-job').disabled=loading||mutating||!jobId;
   $('retry-job').disabled=locked||!jobId||!['failed','interrupted','completed_with_exceptions'].includes(job?.status);
@@ -80,11 +82,11 @@ async function refresh(){
 }
 async function mutate(action,fields){
   if(loading||mutating||!commands)return;const state=commands;mutating=true;controls();
-  try{const current=await readSession();session=current;if(current.user?.id!==state.actorId){clearScope();commands=null;throw Object.assign(Error('Account changed'),{status:403});}if(!canOperate(current,world?.grantTownId))throw Object.assign(Error('Permission changed'),{status:403});
+  try{const current=await readSession();session=current;if(current.user?.id!==state.actorId){clearScope();commands=null;throw Object.assign(Error('Account changed'),{status:403});}if(!canOperate(current,world?.grantTownId))throw Object.assign(Error('Permission changed'),{status:403});if(action==='invoice'&&!projection?.invoiceEligibleAccountIds?.includes(fields?.accountId))throw Error('This account has no confirmed invoice eligibility.');
     const receipt=action==='retry'?await state.retry():await state.execute(action,fields);
     if(receipt.result.status==='resolved')say('The read review was confirmed. Refresh the actual records to inspect its effect.');
     else{renderJob(receipt.result);say('The request identity was confirmed. A queued job is not completed billing, invoicing or settlement.');try{localStorage.setItem(jobKey,jobId);}catch{}}
-  }catch(error){say(state.pending?'The operator request is unconfirmed. Its original identity is retained; retry it before another change.':safeError(error));}
+  }catch(error){say(error.permanentlyRejected?'The authoritative commercial owner permanently refused this exact request. It was not accepted; the retained identity has been released. Refresh actual records before choosing another action.':state.pending?'The operator request is unconfirmed. Its original identity is retained; retry it before another change.':safeError(error));if(error.permanentlyRejected)projection=null;}
   finally{mutating=false;controls();}
 }
 $('refresh').onclick=refresh;$('retry').onclick=()=>mutate('retry');$('refresh-job').onclick=refreshJob;$('retry-job').onclick=()=>mutate('retry-job',{jobId});
