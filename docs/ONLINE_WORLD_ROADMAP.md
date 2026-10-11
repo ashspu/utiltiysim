@@ -39,6 +39,10 @@ The following original checkpoint is retained for context; the dated update abov
 
 ## Five coordinated workstreams
 
+### Physical v4 release accepted, 11 October
+
+Canonical https://utiltiysim.vercel.app/ now serves `9aab268` / `dpl_BJaRdkpUNUxZJiVQvRhwmd9cPHwD`. The owner saved and reopened a new 42-control setup after a full reload; every exact numeric value and all six enabled groups were retained. The earlier v2 setup still has its original 21 controls and all original values. No production simulation was started and compute remains unconnected. Evidence: `P:/UtilitySim/outputs/shell-workos/production-physical-v4-persistence.json`. Release validation passed 64 shell/auth/storage/gateway tests, 20 focused UI tests, 28 targeted Python tests and 29 staged access probes. PR78 remains draft and unmerged.
+
 | Workstream | Next implementation | Acceptance gate | Owner/dependency |
 | --- | --- | --- | --- |
 | 1. Bring compute online | Package the existing physical engine as a persistent service. Compare an Azure container/VM deployment with the actual SQLite/WAL, durable-volume and single-writer requirements; separate Vercel frontend from world storage/jobs. Add authenticated instance library, idempotent creation from pinned snapshots, durable jobs, restart recovery, progress and cancellation at committed boundaries. | Create a new isolated world, advance, restart the service, resume the same world/history, and prove principal/town isolation. Back up/restore an isolated world; measure small and 5k workloads before selecting capacity or cost. | Persistent hosted worlds owner `01a12bf4-9f78-7411-ac48-15750ae1d151`; shell owns WorkOS gateway. Deployment/provider/cost selection remains an explicit next decision. |
