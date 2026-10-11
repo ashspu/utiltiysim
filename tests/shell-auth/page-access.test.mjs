@@ -13,7 +13,7 @@ function gate({verified = true, granted = true, failure = false} = {}) {
 const request = (path,cookie,method='GET') => new Request('https://example.com'+path,{method,headers:cookie ? {cookie:'utilitysim-session='+cookie} : {}});
 test('only introduction assets and independently protected API handlers bypass the page gate',async()=>{
   const run=gate();
-  for(const path of ['/','/index.html','/landing.js','/welcome.css','/assets/civic-welcome-landscape.png','/brand/utility-studio-icon-color.svg','/api/auth/login','/atlas/api/state','/api/runtime']) {
+  for(const path of ['/','/index.html','/landing.js','/welcome.css','/assets/lantern-harbour-welcome.webp','/assets/lantern-harbour-welcome-small.webp','/brand/utility-studio-icon-color.svg','/api/auth/login','/atlas/api/state','/api/runtime']) {
     const result=await run(request(path));assert.equal(result.headers.get('x-middleware-next'),'1',path);
   }
   for(const path of ['/workspace.html','/library.html?town=town-a','/viewer/','/presets/shared/tiled-map.html?preset=town-a']) {
@@ -53,7 +53,7 @@ test('public welcome exposes only login while retaining artwork and four story c
   assert.equal([...html.matchAll(/<(?:a|button)\b/g)].length,1);
   assert.match(html,/id="sign-in"[^>]+href="\/api\/auth\/login/);
   assert.match(html,/utility-studio-icon-color.svg/);
-  assert.match(html,/civic-welcome-landscape.png/);
+  assert.match(html,/lantern-harbour-welcome.webp/);
   assert.equal([...html.matchAll(/data-story-chapter=/g)].length,4);
   assert.doesNotMatch(html,/Civic Atlas|Discover UtilitySim|Choose a world|A WORLD READY TO EXPLORE|welcome-masthead|welcome-account|saved-world-section|data-page=/i);
 });

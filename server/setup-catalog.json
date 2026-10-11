@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "utilitysim-setup-catalog/1",
+  "configuration": {
+    "schemas": {
+      "world": {
+        "type": "object",
+        "properties": {
+          "weather": {
+            "type": "object",
+            "title": "Daily weather",
+            "properties": {
+              "winter_mean_c": {
+                "type": "number",
+                "title": "Winter average",
+                "default": 2.0,
+                "x-unit": "\u00b0C"
+              },
+              "summer_mean_c": {
+                "type": "number",
+                "title": "Summer average",
+                "default": 26.0,
+                "x-unit": "\u00b0C"
+              },
+              "daily_weather_spread_c": {
+                "type": "number",
+                "title": "Daily variation",
+                "default": 6.0,
+                "x-unit": "\u00b0C",
+                "minimum": 0
+              }
+            }
+          },
+          "meters": {
+            "type": "object",
+            "title": "Meter condition",
+            "properties": {
+              "annual_meter_failure": {
+                "type": "number",
+                "title": "Annual base failure probability",
+                "default": 0.015,
+                "x-unit": "",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "annual_meter_drift": {
+                "type": "number",
+                "title": "Annual drift probability",
+                "default": 0.01,
+                "x-unit": "",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "defaults": {
+      "world": {
+        "weather": {
+          "winter_mean_c": 2.0,
+          "summer_mean_c": 26.0,
+          "daily_weather_spread_c": 6.0
+        },
+        "meters": {
+          "annual_meter_failure": 0.015,
+          "annual_meter_drift": 0.01
+        }
+      }
+    }
+  },
+  "sources": [
+    {
+      "id": "lantern-harbour",
+      "name": "Lantern Harbour",
+      "status": "accepted-map",
+      "preview": "/assets/lantern-harbour-welcome.webp",
+      "previewSmall": "/assets/lantern-harbour-welcome-small.webp",
+      "description": "Marina, waterfront neighborhoods, parks and an industrial edge.",
+      "previewLabel": "Accepted whole-map illustration",
+      "snapshotSha256": "8d4e242f9d0a62fcf3babbb79a40405adfdf935b5c514e75f7485a58d3ae4083",
+      "premises": 436,
+      "homes": 300,
+      "meters": 1262,
+      "canConfigure": true,
+      "grantTownId": "lantern-bay-500",
+      "townId": "town-47ecb8e861787476",
+      "sourceRevision": "62bd251fba957150799feed2743b5026da6d4dcac1bdb839231ea0c2be64a4f0"
+    },
+    {
+      "id": "ashtown",
+      "name": "Ashtown",
+      "status": "development-only",
+      "preview": "/presets/ashtown-5000/setup-preview.jpg",
+      "description": "Six illustrated zoning regions; property alignment is being rebuilt.",
+      "previewLabel": "Generated zoning preview \u00b7 Ashtown rebuild in progress",
+      "canConfigure": false,
+      "grantTownId": "ashtown-5000"
+    }
+  ]
+}

@@ -14,6 +14,13 @@ const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-
 for (const file of ['workspace.html','workspace.js','workspace.css']) shellFiles.add(file);
 const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
 const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
+for (const match of welcomeHtml.matchAll(/srcset="([^"]+)"/g)) {
+  for (const candidate of match[1].split(',')) {
+    const asset = candidate.trim().split(/\s+/)[0];
+    if (!asset.startsWith('/assets/') || asset.includes('..')) throw new Error('Invalid welcome image candidate');
+    welcomeAssets.add(asset.slice('/assets/'.length));
+  }
+}
 for (const asset of welcomeAssets) {
   if (!fs.existsSync(path.join(web, 'assets', asset))) throw new Error(`Missing welcome art: ${asset}`);
 }
@@ -49,7 +56,7 @@ fs.cpSync(web, out, {recursive: true, filter(source) {
   if (relative[0] !== 'presets') return relative.length === 1 && shellFiles.has(relative[0]);
   if (relative.length === 1 || relative[1] === 'catalog.json' || relative[1] === 'shared') return true;
   if (!townIds.has(relative[1])) return false;
-  return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]);
+  return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]) || relative[2] === 'setup-preview.jpg';
 }});
 fs.writeFileSync(path.join(out, 'index.html'), welcomeHtml);
 // Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.

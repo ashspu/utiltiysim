@@ -7,7 +7,7 @@ import { grantsFor, permits } from './permissions.mjs';
 // own authorization; static workspace files must pass this gate before cache.
 const publicPaths = new Set(['/', '/index.html', '/landing.js', '/landing.css', '/welcome.js', '/welcome.css', '/style.css',
   '/brand/utility-studio-icon-color.svg', '/favicon.ico',
-  ...['civic-welcome-landscape.png','civic-block-pine-willow.png','civic-city-studies.png','civic-block-maple-park.png','civic-block-main-north.png'].map(file => '/assets/' + file)]);
+  ...['lantern-harbour-welcome.webp','lantern-harbour-welcome-small.webp','civic-block-pine-willow.png','civic-city-studies.png','civic-block-maple-park.png','civic-block-main-north.png'].map(file => '/assets/' + file)]);
 const signedInPaths = new Set(['/workspace.html','/workspace.js','/workspace.css','/shell-session.js']);
 const townId = /^[a-z0-9][a-z0-9-]{0,99}$/;
 export function createPageAccess({ env = process.env, client = cfg => new WorkOS(cfg.apiKey, { clientId: cfg.clientId }), pass = next } = {}) {
@@ -15,7 +15,7 @@ export function createPageAccess({ env = process.env, client = cfg => new WorkOS
     const url = new URL(request.url);
     let path;
     try { path = decodeURIComponent(url.pathname); } catch { return new Response('Invalid path', {status:400}); }
-    if (publicPaths.has(path) || path.startsWith('/api/auth/') || path === '/api/runtime' || path.startsWith('/atlas/api/')) return pass();
+    if (publicPaths.has(path) || path.startsWith('/api/auth/') || path === '/api/runtime' || path === '/api/setups' || path.startsWith('/atlas/api/')) return pass();
     const headers = new Headers({'Cache-Control':'private, no-store','Vercel-CDN-Cache-Control':'no-store'});
     const pending = new Map();
     const res = { getHeader: key => pending.get(key), setHeader: (key,value) => pending.set(key,value) };

@@ -1,10 +1,14 @@
 /* The approved utility icon and UtilitySim name are part of the hero itself. */
 body[data-view="welcome"] #welcome-page{padding-top:24px}
-#welcome-page .welcome-hero{height:780px}
+#welcome-page .welcome-hero{height:740px;background:#f0f4ef;display:grid;grid-template-columns:42% 58%;align-items:center}
+#welcome-page #hero-image{position:relative;inset:auto;grid-column:2;grid-row:1;width:100%;height:100%;object-fit:contain;object-position:center;z-index:0}
+#welcome-page .welcome-hero:before{display:none}
 .hero-brand{position:absolute;top:34px;left:56px;display:flex;align-items:center;gap:14px;color:#10344c}
 .hero-brand img{width:64px;height:64px;object-fit:contain}
 .hero-brand span{font-size:34px;font-weight:750;letter-spacing:-1.3px}
-#welcome-page .welcome-copy{padding-top:140px}
+#welcome-page .welcome-copy{grid-column:1;grid-row:1;padding:130px 24px 80px 40px;max-width:none}
+#welcome-page .welcome-copy h1{font-size:clamp(36px,3.6vw,57px)}
+#welcome-page .welcome-art-caption{bottom:14px;right:14px}
 #welcome-page .welcome-actions a{display:inline-flex;align-items:center;justify-content:center;gap:25px;text-decoration:none;border-radius:6px;color:white}
 .welcome-connection-card{display:flex;align-items:center;padding:15px 17px;background:white;border:1px solid #e5eaee;border-radius:7px;gap:13px;text-align:left}
 #welcome-page .welcome-story-progress>span{border-top:2px solid #dce6df;padding:12px 0;display:flex;align-items:center;gap:8px;font-size:10px;color:#667b7b}
@@ -12,4 +16,12 @@ body[data-view="welcome"] #welcome-page{padding-top:24px}
 #welcome-page .welcome-story-progress>span[aria-current="step"]{border-color:#008997;color:#087686}
 a:focus-visible,button:focus-visible{outline:3px solid #008697;outline-offset:4px}
 @media(max-width:1150px){.hero-brand{left:36px}.welcome-connection-card{padding:13px;gap:9px}}
-@media(max-width:760px){body[data-view="welcome"] #welcome-page{padding-top:16px}#welcome-page .welcome-hero{height:880px}.hero-brand{top:28px;left:25px;gap:12px}.hero-brand img{width:48px;height:48px}.hero-brand span{font-size:29px}#welcome-page .welcome-copy{padding-top:113px}.welcome-connection-card{padding:10px 13px}#welcome-page .welcome-ecosystem{grid-template-columns:1fr;gap:24px}}
+#welcome-page .welcome-ecosystem{display:block;border-top:1px solid #dce5df;padding-top:48px;margin-top:40px}
+.ecosystem-intro{max-width:760px}.ecosystem-intro h2{font-size:36px}.ecosystem-intro p{font-size:15px;line-height:1.8}
+.ecosystem-legend{display:flex;flex-wrap:wrap;align-items:center;gap:24px;margin:30px 0 12px;font-size:12px;color:#425d66}
+.ecosystem-legend>span{display:flex;align-items:center;gap:10px}.ecosystem-legend i{display:inline-block;width:35px;border-top:3px solid #b94736}.ecosystem-legend .navigation-key{border-top:2px solid #83959b}.ecosystem-legend small{margin-left:auto;color:#617872}
+.ecosystem-diagram{display:block;width:100%;height:auto;background:#f1f5f1;border:1px solid #dce5df;border-radius:14px}
+.ecosystem-node rect{fill:#fff;stroke:#cadbd3;stroke-width:1.5}.ecosystem-node text{fill:#163d4a;font:600 17px system-ui,sans-serif}.ecosystem-node .node-note{fill:#658078;font:12px system-ui,sans-serif}.loop-label{fill:#a04b3e;font:13px system-ui,sans-serif}
+.ecosystem-reading{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:28px}.ecosystem-reading h3{font-size:15px;color:#203e4a}.ecosystem-reading p{font-size:13px;line-height:1.8;color:#607877}
+@media(max-width:1150px) and (min-width:761px){#welcome-page .welcome-hero{height:620px}.hero-brand{left:28px}.hero-brand span{font-size:29px}.hero-brand img{width:48px;height:48px}#welcome-page .welcome-copy{padding-left:28px;padding-right:16px}#welcome-page .welcome-copy h1{font-size:38px;letter-spacing:-1.3px}}
+@media(max-width:760px){body[data-view="welcome"] #welcome-page{padding-top:16px}#welcome-page .welcome-hero{height:auto;display:flex;flex-direction:column;align-items:stretch}.hero-brand{top:28px;left:25px;gap:12px}.hero-brand img{width:48px;height:48px}.hero-brand span{font-size:29px}#welcome-page .welcome-copy{order:1;padding:116px 25px 30px}#welcome-page #hero-image{order:2;width:100%;height:auto;aspect-ratio:1266/1243}#welcome-page .welcome-copy h1{font-size:40px}#welcome-page .welcome-art-caption{font-size:8px;bottom:10px;right:10px}.ecosystem-intro h2{font-size:29px}.ecosystem-reading{grid-template-columns:1fr;gap:8px}.ecosystem-legend{gap:14px}.ecosystem-legend small{width:100%;margin-left:0}.ecosystem-diagram{display:none}}
