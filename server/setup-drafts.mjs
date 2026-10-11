@@ -35,13 +35,18 @@ export function validateSetup(input, setupCatalog = catalog) {
   if (!source || source.snapshotSha256 !== input.snapshotSha256 || source.sourceRevision !== input.sourceRevision) fail('This map revision is not available for setup. Select the current accepted town.');
   const extended = input.configuration && (Object.hasOwn(input.configuration,'physical') || Object.hasOwn(input.configuration,'schemaVersion'));
   keys(input.configuration, extended ? ['world','physical','schemaVersion'] : ['world']);
-  if (extended && (input.configuration.schemaVersion !== 'physical-setup/2' || setupCatalog.configuration.configurationVersion !== 'physical-setup/2' || !setupCatalog.configuration.schemas.physical)) fail('Select the advertised physical-setup/2 configuration.');
-  const world = validateFields(input.configuration.world, setupCatalog.configuration.schemas.world);
+  const version = input.configuration?.schemaVersion;
+  const advertised = setupCatalog.configuration;
+  const selected = extended ? (Object.hasOwn(advertised.supportedVersions || {},version || '') ? advertised.supportedVersions[version] : advertised.configurationVersion === version ? advertised : null) : advertised;
+  if (extended && (!['physical-setup/2','physical-setup/3','physical-setup/4'].includes(version) || !selected?.schemas?.physical)) fail('Select a supported physical setup configuration version.');
+  const world = validateFields(input.configuration.world, selected.schemas.world);
   const configuration = {world};
   if (extended) {
-    configuration.schemaVersion = 'physical-setup/2';
-    configuration.physical = validateFields(input.configuration.physical, setupCatalog.configuration.schemas.physical);
+    configuration.schemaVersion = version;
+    configuration.physical = validateFields(input.configuration.physical, selected.schemas.physical);
     if (configuration.physical.householdCashflow.enabled && !configuration.physical.householdFinance.enabled) fail('Household cashflow requires household finance profiles.');
+    const mix = configuration.physical.meterChannels;
+    if (mix && Math.abs(mix.amiPercent + mix.amrPercent + mix.manualPercent - 100) > 1e-8) fail('AMI, AMR and manual meter shares must total 100 percent.');
   }
   return { id:input.id, commandId:input.commandId, revision:input.revision, name:input.name.trim(), start:input.start,
     sourceId:source.id, sourceRevision:source.sourceRevision, townId:source.townId, grantTownId:source.grantTownId, snapshotSha256:source.snapshotSha256, configuration };
