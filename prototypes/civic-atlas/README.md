@@ -1,4 +1,14 @@
-# Civic Atlas: incomplete prototype and handoff
+# Civic Atlas
+
+**Current seven-town release: [Connected town library](TOWN_LIBRARY.md).** It
+provides the tiled map shell on port 8044, configuration-first town authoring,
+and the persistent local Virtual Systems workflow. Start there for current run
+instructions, counts and hosting limits.
+
+## Historical prototype and handoff
+
+The following sections preserve earlier experiments and their limitations.
+They do not describe the current seven-town library.
 
 **Start with [HANDOFF.md](HANDOFF.md).** As of 10 October 2026, the owner says this is still well short of the requested result. This folder preserves the runnable exploration, original documents, concept artwork, findings, evidence and continuation plan. Agent-level experiment checks are not product or visual sign-off.
 

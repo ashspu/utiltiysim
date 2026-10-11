@@ -1,5 +1,10 @@
 # Civic Atlas on Windows
 
+**Current library:** use [TOWN_LIBRARY.md](TOWN_LIBRARY.md) to run all seven
+towns and the connected shell on port 8044. The sections below are historical
+notes for the preserved experiments on ports 8041–8043. Their old counts,
+planned-town statements and integration limits apply only to those versions.
+
 ## Two River Forest experiment — 10 October 2026
 
 Run `prototypes/civic-atlas/start-local.ps1 -Preset two-river-forest-500`. The separate saved store is `out/civic-atlas-two-river-forest-500-v2`; port 8043 serves the shell and the new illustrated map at `/presets/two-river-forest-500/review.html?stage=hybrid`. The map's tools switch through the image/SVG/system-binding stages; Pilot area reveals the higher-resolution neighbourhood. Every one of 476 property regions and 103 road segments is selectable. The snapshot has 451 homes (user-approved 450–550 tolerance), 100 pools, no solar, one school, one church, 16 shops, six industrial premises and one water-works premise. It retains seven simulation days and 1,384 meters.
