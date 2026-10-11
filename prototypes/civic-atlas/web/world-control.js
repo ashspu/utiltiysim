@@ -2,8 +2,14 @@ import { addDays, dateValue, AdvanceController } from './world-control-core.mjs'
 import { createStormPanel } from './world-control-events.mjs';
 import { createSentimentPanel, commandPanelsLocked, coordinateCommandPanels } from './world-control-sentiment.mjs';
 import { readSession } from './shell-session.js';
+import { createConnectedPanel } from './world-control-connected.mjs';
+import { ConnectedCommandController } from './world-control-connected-state.mjs';
+import { clockIsManaged, connectedView } from './world-control-connected-view.mjs';
 const $ = id => document.getElementById(id);
 let status = null, offset = 0, total = 0, reading = false;
+let connectedStatus = null, connectedCommands = null, connectedActor = null, canControl = false;
+let connectedRefreshing = false, pollTimer = null, pollRemaining = 0;
+let connectedPreflight = false;
 const catalogSources = fetch('/api/setups?view=catalog',{cache:'no-store'}).then(async response => response.ok ? (await response.json()).sources : []).catch(()=>[]);
 async function request(action, params = {}, body) {
   const response = await fetch(`/api/compute?${new URLSearchParams({ action, ...params })}`, {
@@ -12,20 +18,42 @@ async function request(action, params = {}, body) {
   });
   let value;
   try { value = await response.json(); } catch { throw new Error('The runtime returned an unreadable response. Refresh saved status.'); }
-  if (!response.ok) { const error = new Error(value.detail || value.error || `Runtime request failed (${response.status}).`); error.rejected = response.status >= 400 && response.status < 500; throw error; }
+  if (!response.ok) { const error = new Error(value.detail || value.error || `Runtime request failed (${response.status}).`); error.rejected = response.status >= 400 && response.status < 500 && (action !== 'connected-command' || value.commandRejected === true); error.status = response.status; throw error; }
   return value;
 }
 const controller = new AdvanceController(request);
 const events = createStormPanel($('event-panel'), request, () => controls());
 const sentiment = createSentimentPanel($('sentiment-panel'), request, () => controls(), readSession().then(value=>value.user?.id).catch(()=>null));
+const connected = createConnectedPanel($('connected-panel'), connectedAction);
 function message(value) { $('message').textContent = value; }
 function controls() {
-  $('controls').disabled = !status?.available || reading || controller.busy || controller.uncertain || commandPanelsLocked(events,sentiment);
+  const managed = clockIsManaged(status), sending = controller.busy || connectedCommands?.busy || connectedPreflight;
+  const uncertain = controller.uncertain || Boolean(connectedCommands?.pending);
+  const executing = managed && (!connectedStatus || connectedStatus.phase === 'running');
+  $('controls').disabled = !status?.available || reading || sending || uncertain || commandPanelsLocked(events,sentiment)
+    || managed && (!canControl || !connectedStatus?.physicalThrough || connectedStatus.producerAvailable === false || !connectedStatus.supportedActions.includes('advance'));
   $('observations').disabled = !status?.available || reading || controller.busy || !status.days;
-  $('open').disabled = reading || controller.busy || events.locked || sentiment.locked;
-  $('world').disabled = reading || controller.busy || events.locked || sentiment.locked;
+  $('open').disabled = reading || sending || events.locked || sentiment.locked;
+  $('world').disabled = reading || sending || events.locked || sentiment.locked;
   $('refresh').disabled = reading || controller.busy || events.locked || sentiment.locked;
-  coordinateCommandPanels(events,sentiment,reading || controller.busy || controller.uncertain);
+  coordinateCommandPanels(events,sentiment,reading || sending || uncertain || executing);
+  $('connected-section').hidden = !managed;
+  $('operation-help').textContent = managed
+    ? 'This world shares its simulation clock with Virtual Systems. The connected controller owns advancement, including while paused.'
+    : 'Time and observations work independently of Virtual Systems.';
+  $('advance-legend').textContent = managed ? 'Request connected advancement' : 'Advance physical time';
+  $('clock-help').textContent = managed
+    ? 'Requests are accepted durably and execute in the background. Pause requests stop at a safe processing boundary. Refresh shows the reported clocks; an uncertain command must be retried with its original identity.'
+    : 'Requests run synchronously for at most 31 new days. Refresh saved status after an uncertain response. Committed days remain saved.';
+  if (managed) {
+    if (connectedStatus) {
+      $('through').min = addDays(connectedStatus.clock.slice(0,10),1);
+      $('through').max = new Date(Date.parse(connectedStatus.clock) + 31*86400000).toISOString().slice(0,10);
+      if ($('through').value < $('through').min || $('through').value > $('through').max) $('through').value = $('through').min;
+    }
+    connected.render(connectedView(status,connectedStatus,connectedCommands,canControl,commandPanelsLocked(events,sentiment)));
+    connected.setBusy(reading || Boolean(sending) || events.busy || sentiment.busy);
+  }
 }
 function render(value) {
   // Never show a previously selected world's state beneath another identity.
@@ -54,23 +82,41 @@ function render(value) {
   $('next').textContent = value?.through || '—';
   $('last').textContent = value?.through && value.days > 0 ? addDays(value.through, -1) : 'No days committed';
   if (value?.through) {
-    $('through').min = addDays(value.through, 1);
-    $('through').max = addDays(value.through, 31);
-    $('through').value = addDays(value.through, 1);
+    const cursor = clockIsManaged(value) && connectedStatus ? connectedStatus.clock.slice(0,10) : value.through;
+    $('through').min = addDays(cursor, 1);
+    $('through').max = addDays(cursor, 31);
+    $('through').value = addDays(cursor, 1);
   }
   controls();
 }
 async function loadWorld(id) {
-  if (!id || reading || controller.busy || commandPanelsLocked(events,sentiment)) return;
+  if (!id || reading || controller.busy || connectedCommands?.busy || connectedPreflight || commandPanelsLocked(events,sentiment)) return;
+  clearTimeout(pollTimer); pollRemaining = 0;
   events.clear();
   sentiment.clear();
+  connected.clear(); connectedStatus = null; connectedCommands = null; connectedActor = null; canControl = false;
   reading = true; render(null); controls();
   try {
     const value = await request('status', { id });
     controller.recovered(); render(value);
+    if (clockIsManaged(value)) {
+      try {
+        const session = await readSession();
+        connectedActor = session.user?.id;
+        canControl = (session.grants || []).some(grant => ['owner','operator'].includes(grant.role) && [value.grantTownId,'*'].includes(grant.town));
+        if (connectedActor) connectedCommands = new ConnectedCommandController({storage:localStorage,request,actorId:connectedActor,worldId:id});
+        // Browser storage failure disables mutation but still permits reading.
+      } catch (error) { canControl = false; message(error.message); }
+      try { connectedStatus = await request('connected',{id}); render(value); } catch (error) { message(error.message); }
+    }
     if (value.available) {await events.load(value);await sentiment.load(value);}
     const url = new URL(location.href); url.searchParams.set('id', id); history.replaceState(null, '', url);
-    message(value.available ? 'Saved physical world loaded. Virtual Systems is not required.' : value.error || 'Saved world is unavailable.');
+    if (!value.available) message(value.error || 'Saved world is unavailable.');
+    else if (!clockIsManaged(value)) message('Saved physical world loaded. Virtual Systems is not required.');
+    else if (connectedCommands?.pending) message('A previous connected request needs confirmation. Retry its saved identity; refreshing status does not replace it.');
+    else if (connectedStatus) message('Connected world loaded. The reported clock and command status determine its available controls.');
+    else message('Connected controller status is unavailable. Physical advancement remains controlled by that controller.');
+    if (connectedStatus?.phase === 'running') { pollRemaining = 24; scheduleConnectedPoll(); }
   } catch (error) { message(error.message); }
   finally { reading = false; controls(); }
 }
@@ -89,6 +135,7 @@ async function list() {
   } catch (error) { message(`${error.message} Configure the compute connection to open persistent simulations.`); }
 }
 async function advance(target) {
+  if (clockIsManaged(status)) return connectedAction('advance',target);
   if (!status || reading || controller.busy || controller.uncertain || commandPanelsLocked(events,sentiment)) return;
   const saved = status;
   try {
@@ -104,12 +151,80 @@ async function advance(target) {
     message(controller.uncertain ? 'The result is uncertain. Refresh saved status before another advance; committed days remain saved.' : error.message);
   } finally { controls(); }
 }
+function scheduleConnectedPoll() {
+  clearTimeout(pollTimer);
+  if (pollRemaining <= 0 || document.hidden || !clockIsManaged(status)) return;
+  pollTimer = setTimeout(async () => {
+    pollRemaining--;
+    try { await refreshConnected(); } catch { return; }
+    if (connectedStatus?.phase === 'running' || connectedStatus?.lastCommand?.status === 'accepted') scheduleConnectedPoll();
+  },2500);
+}
+async function refreshConnected() {
+  if (!status || connectedRefreshing) return;
+  const id = status.id, previousThrough = status.through;
+  connectedRefreshing = true;
+  try {
+    const value = await request('status',{id});
+    const reported = await request('connected',{id});
+    if (status?.id !== id) return;
+    connectedStatus = reported; render(value);
+    connectedCommands?.recovered(reported);
+    if (previousThrough !== value.through && reported.phase !== 'running' && !commandPanelsLocked(events,sentiment)) {
+      await events.load(value); await sentiment.load(value);
+    }
+  } catch (error) {
+    if (status?.id === id) { connectedStatus = null; message(error.message); controls(); }
+    throw error;
+  } finally { connectedRefreshing = false; controls(); }
+}
+async function connectedAction(action,target) {
+  if (action === 'refresh') return refreshConnected();
+  if (!status || !clockIsManaged(status) || reading || !connectedCommands || connectedCommands.busy || connectedPreflight
+      || (action === 'retry' ? events.busy || sentiment.busy : commandPanelsLocked(events,sentiment))) return;
+  if (!canControl) throw new Error('Current operator or owner access is required.');
+  const id = status.id, commands = connectedCommands;
+  connectedPreflight = true; controls();
+  try {
+    const session = await readSession();
+    if (status?.id !== id || connectedCommands !== commands) throw new Error('The selected world changed. Reload its status before sending a command.');
+    if (session.user?.id !== connectedActor) throw new Error('Your signed-in account changed. Reload this world before sending a command.');
+    let pending;
+    if (action === 'retry') pending = connectedCommands.retry();
+    else {
+      if (!connectedStatus?.supportedActions.includes(action)) throw new Error('Refresh the controller status to see its supported actions.');
+      let through;
+      if (action === 'advance') {
+        if (connectedStatus.producerAvailable === false || !connectedStatus.physicalThrough) throw new Error('Physical producer status is unavailable. Refresh before requesting advancement.');
+        const day = target || addDays(connectedStatus.clock.slice(0,10),1);
+        dateValue(day); through = `${day}T00:00:00Z`;
+        const seconds = (Date.parse(through) - Date.parse(connectedStatus.clock))/1000;
+        if (seconds <= 0 || seconds > 31*86400) throw new Error('Choose a target after the Virtual Systems clock and within 31 days.');
+      }
+      pending = connectedCommands.execute(action,connectedStatus.revision,through);
+    }
+    controls();
+    const receipt = await pending;
+    if (status?.id !== id) return;
+    message(`Command accepted durably (${receipt.commandId}). Reported processing determines completion.`);
+    await refreshConnected();
+    pollRemaining = 24; scheduleConnectedPoll();
+  } catch (error) {
+    if (status?.id === id) {
+      message(connectedCommands?.pending ? 'The request is uncertain. Retry the retained command with the same identity and target.' : error.message);
+      // A definitive rejection releases identity, but its old status/revision
+      // is no longer sufficient authority to issue a new command.
+      if (error.rejected) connectedStatus = null;
+    }
+    throw error;
+  } finally { connectedPreflight = false; controls(); }
+}
 $('open').onclick = () => loadWorld($('world').value);
-$('refresh').onclick = () => loadWorld(status?.id || new URL(location.href).searchParams.get('id'));
+$('refresh').onclick = () => clockIsManaged(status) ? refreshConnected().catch(()=>{}) : loadWorld(status?.id || new URL(location.href).searchParams.get('id'));
 $('more').onclick = async () => { $('more').disabled = true; await list(); $('more').disabled = false; };
-$('day').onclick = () => advance(addDays(status.through, 1));
-$('fast').onclick = () => advance(addDays(status.through, Number($('batch').value)));
-$('advance').onclick = () => advance($('through').value);
+$('day').onclick = () => advance(addDays(clockIsManaged(status) ? connectedStatus.clock.slice(0,10) : status.through, 1)).catch(()=>{});
+$('fast').onclick = () => advance(addDays(clockIsManaged(status) ? connectedStatus.clock.slice(0,10) : status.through, Number($('batch').value))).catch(()=>{});
+$('advance').onclick = () => advance($('through').value).catch(()=>{});
 $('observations').onclick = async () => {
   const saved = status;
   $('observations').disabled = true;
