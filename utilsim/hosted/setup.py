@@ -9,10 +9,11 @@ from time import monotonic
 from jsonschema import Draft202012Validator
 
 from utilsim.config.wizard import world_configuration
-from utilsim.world import contacts, customer_cashflow, customer_finance
+from utilsim.world import contacts, customer_cashflow, customer_finance, physical_profiles
 from utilsim.world.store import canonical
 
-VERSION = 'physical-setup/2'
+VERSION = 'physical-setup/3'
+SUPPORTED_VERSIONS = ('physical-setup/2', VERSION)
 MAX_NEW_COMMANDS = 10
 MAX_BATCH_SECONDS = 8
 
@@ -33,9 +34,9 @@ def group(title, fields):
     return {'type': 'object', 'title': title, 'additionalProperties': False, 'properties': fields}
 
 
-def schema():
+def schema(version=VERSION):
     active = {'type': 'boolean', 'title': 'Enable this world behavior', 'default': False, 'x-control': {'kind': 'toggle'}}
-    return group('Physical and customer assumptions', {
+    result = group('Physical and customer assumptions', {
         'customerContacts': group('Customer reactions to physical problems', {
             'active': active,
             'noticeProbabilityPerDay': number('Daily chance of noticing an experienced problem', .5, 0, 1, .01, 'probability',
@@ -75,24 +76,61 @@ def schema():
                     'all-or-nothing': 'Skip an unaffordable expense; record the full amount unpaid'}}},
         }),
     })
+    if version == 'physical-setup/2':
+        return result
+    result['properties'].update({
+        'meterChannels': group('Meter technology and collection', {
+            'enabled': {**active, 'title': 'Apply meter technology and collection assumptions'},
+            **{key.lower() + 'Percent': number(key + ' share', default, 0, 100, 1, 'percent',
+                'Shares must total 100%. Assignments preserve existing meter identities.', ['Smaller share', 'Larger share'])
+               for key, default in [('AMI', 80), ('AMR', 15), ('MANUAL', 5)]},
+            'amrReadIntervalDays': number('AMR collection interval', 7, 1, 366, 1, 'UTC days',
+                'Collects an accumulated measured interval on a fixed schedule; does not configure crews or routing.', ['More frequent', 'Less frequent'], integer=True),
+            'manualReadIntervalDays': number('Manual collection interval', 30, 1, 366, 1, 'UTC days',
+                'Collects an accumulated measured interval on a fixed schedule; does not configure crews or routing.', ['More frequent', 'Less frequent'], integer=True),
+            **{key.lower() + 'ReadSuccess': number(key + ' collection success', default, 0, 1, .01, 'probability',
+                'Chance a scheduled collection succeeds. A missed collection retains measured accumulation for a later read.', ['More missed collections', 'More successful collections'])
+               for key, default in [('AMI', .99), ('AMR', .98), ('MANUAL', .95)]},
+        }),
+        'housingAge': group('Housing age and thermal demand', {
+            'enabled': {**active, 'title': 'Apply housing-age scenario to residential premises'},
+            'meanAgeYears': number('Central house age', 40, 0, 200, 1, 'years',
+                'Centre of a uniform age distribution, clipped to 0–200 years. This is not a condition rating.', ['Newer homes', 'Older homes'], integer=True),
+            'ageSpreadYears': number('Age spread either side of the centre', 30, 0, 200, 1, 'years',
+                'Wider values create a more varied housing stock; clipping can shift the realised mean.', ['Similar ages', 'Varied ages'], integer=True),
+            'extraThermalDemandPer50Years': number('Extra thermal demand per 50 years of age', .25, 0, 2, .01, 'fraction',
+                'Illustrative sensitivity, not a calibrated age-efficiency rule. Scales heating and cooling only.', ['No age effect', 'Stronger age effect']),
+            'retrofittedPercent': number('Homes with thermal retrofit', 0, 0, 100, 1, 'percent',
+                'A modeled retrofit removes 75% of the age-related extra thermal demand; a scenario assumption, not a measured standard.', ['Fewer retrofits', 'More retrofits']),
+        }),
+    })
+    result['properties']['meterChannels']['x-control'] = {'kind': 'linked-percentages', 'total': 100,
+        'fields': ['amiPercent', 'amrPercent', 'manualPercent']}
+    for group_name, keys in [('meterChannels', ['amiPercent', 'amrPercent', 'manualPercent']),
+                             ('housingAge', ['meanAgeYears', 'ageSpreadYears'])]:
+        for key in keys:
+            result['properties'][group_name]['properties'][key]['x-control']['severityBasis'] = 'descriptive'
+    return result
 
 
-def defaults():
+def defaults(version=VERSION):
     return {key: {name: field['default'] for name, field in spec['properties'].items()}
-            for key, spec in schema()['properties'].items()}
+            for key, spec in schema(version)['properties'].items()}
 
 
-def normalize(supplied):
+def normalize(supplied, version=VERSION):
     if not isinstance(supplied, dict):
         raise ValueError('Physical configuration must be an object.')
-    errors = sorted(Draft202012Validator(schema()).iter_errors(supplied), key=lambda e: str(e.path))
+    errors = sorted(Draft202012Validator(schema(version)).iter_errors(supplied), key=lambda e: str(e.path))
     if errors:
         raise ValueError('Invalid physical setup: ' + errors[0].message)
-    result = defaults()
+    result = defaults(version)
     for key, values in supplied.items():
         result[key].update(values)
     if result['householdCashflow']['enabled'] and not result['householdFinance']['enabled']:
         raise ValueError('Household cashflow requires household finance profiles.')
+    if version == VERSION:
+        physical_profiles.validate(result['meterChannels'], result['housingAge'])
     return result
 
 
@@ -117,7 +155,7 @@ def presentation():
             'defaults': {'schemaVersion': VERSION, 'world': initial, 'physical': defaults()},
             'scope': {'householdPolicies': 'Uniform initial assumptions for occupied residential premises only',
                       'currency': 'Minor currency units; no currency conversion or enterprise tariff configuration',
-                      'unsupportedRequiredControls': ['AMI/AMR/manual channel effects', 'housing age effects', 'customer sentiment feedback']}}
+                      'unsupportedRequiredControls': ['customer sentiment feedback']}}
 
 
 def apply(world, identity, configuration, bindings, snapshot, progress):
@@ -153,7 +191,17 @@ def apply(world, identity, configuration, bindings, snapshot, progress):
     finance = physical['householdFinance']
     flow = physical['householdCashflow']
     total = int(physical['customerContacts']['active']) + len(eligible) * int(finance['enabled']) * (1 + int(flow['enabled']))
+    profiles_enabled = any(physical.get(group, {}).get('enabled', False) for group in ('meterChannels', 'housingAge'))
+    total += int(profiles_enabled)
     try:
+        if profiles_enabled:
+            profile_command = str(uuid.uuid5(uuid.UUID(identity), 'physical-profiles:world'))
+            physical_profiles.configure(world, profile_command, physical['meterChannels'], physical['housingAge'],
+                                        [b['premiseId'] for b in bindings if b.get('premiseType') == 'residential'])
+            completed += 1
+            if profile_command not in prior_commands:
+                new_commands += 1
+                progress(completed)
         if physical['customerContacts']['active']:
             execute('contacts', contacts, physical['customerContacts'])
         if finance['enabled']:

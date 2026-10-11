@@ -106,7 +106,7 @@ def create_app(root, token):
                 'grantTownId': manifest['grantTownId'], 'counts': manifest['counts'],
                 **presentation(),
                 'immutable': ['streets', 'parcels', 'premiseIds', 'serviceIds', 'meterIds'],
-                'currentAdapterFixed': ['startingPopulation', 'demandProfiles', 'networkTopology', 'housingAge', 'meterChannels', 'timezone'],
+                'currentAdapterFixed': ['startingPopulation', 'baseDemandProfiles', 'networkTopology', 'timezone'],
                 'excluded': ['billing', 'collections', 'VEE', 'staffing', 'enterpriseWorkQueues', 'studioRun']}
 
     @app.get('/hosted/worlds')
@@ -154,7 +154,11 @@ def create_app(root, token):
     @app.get('/hosted/worlds/{identity}/premises/{premise}')
     def premise_record(identity: str, premise: str, request: Request):
         owned(identity, request)
-        return {'worldInstanceId': identity, **WorldMap(library.library.world(identity)).premise(premise)}
+        from utilsim.world import physical_profiles
+
+        world = library.library.world(identity)
+        return {'worldInstanceId': identity, **WorldMap(world).premise(premise),
+                'physicalProfiles': physical_profiles.inspect(world, premise)}
 
     @app.get('/hosted/worlds/{identity}/premises/{premise}/history')
     def history(identity: str, premise: str, request: Request, offset: int = Query(0, ge=0), limit: int = Query(14, ge=1, le=31)):
@@ -162,12 +166,23 @@ def create_app(root, token):
         world = library.library.world(identity)
         record = WorldMap(world).premise(premise)
         with world.read_db() as db:
+            from utilsim.world import physical_profiles
+
             rows = [dict(r) for r in db.execute(
                 'SELECT o.day,a.id assetId,a.commodity,a.unit,o.id observationId,o.status,o.quantity observedQuantity '
                 'FROM assets a JOIN observations o ON o.asset=a.id '
                 'WHERE a.premise=? AND o.day IN (SELECT day FROM days ORDER BY day DESC LIMIT ? OFFSET ?) '
                 'ORDER BY o.day DESC,a.id', (premise, limit, offset))]
             total = db.execute('SELECT COUNT(*) FROM days').fetchone()[0]
+            if rows:
+                from datetime import date, timedelta
+
+                periods = physical_profiles.intervals(db, world.metadata(db), min(r['day'] for r in rows),
+                    (date.fromisoformat(max(r['day'] for r in rows)) + timedelta(days=1)).isoformat())
+                for reading in rows:
+                    period = periods.get(reading['observationId'])
+                    if period:
+                        reading.update(intervalStart=period['start'], intervalEnd=period['end'], technology=period['technology'])
         return {'worldInstanceId': identity, 'environmentId': record['environmentId'], 'townId': record['townId'],
                 'premise': record['premise'], 'through': record['through'], 'totalDays': total,
                 'offset': offset, 'limit': limit, 'readings': rows}

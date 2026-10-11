@@ -83,7 +83,7 @@ def test_schema_sliders_and_rejection_of_unsupported_or_invalid_fields(setup):  
     assert response['configurationVersion'] == physical_setup.VERSION
     control = response['schemas']['physical']['properties']['householdFinance']['properties']['cashCents']['x-control']
     assert control['kind'] == 'slider' and control['allowExactInput'] and control['effect']
-    assert 'housingAge' in response['currentAdapterFixed']  # explicit gap, not claimed effect
+    assert 'housingAge' not in response['currentAdapterFixed']
     for config in ({'physical': {}}, {'schemaVersion': 'unknown'},
                    {'schemaVersion': physical_setup.VERSION, 'physical': {'staffing': {}}},
                    {'schemaVersion': physical_setup.VERSION, 'physical': {'householdFinance': {'cashCents': -1}}},
@@ -114,3 +114,29 @@ def test_time_budget_stops_between_atomic_commands(setup, monkeypatch):  # noqa:
     result = client.post('/hosted/worlds', json=configured(value), headers=headers()).json()
     assert result['state'] == 'configuring' and not result['available']
     assert result['initialization']['appliedCommands'] == 1
+
+
+def test_v2_remains_identical_and_v3_profiles_apply_without_changing_map(setup):  # noqa: F811
+    root, _, value, snapshot = setup
+    client = TestClient(create_app(root, TOKEN))
+    legacy = configured(value)
+    legacy['configuration']['schemaVersion'] = 'physical-setup/2'
+    old = client.post('/hosted/worlds', json=legacy, headers=headers()).json()
+    assert set(old['configuration']['physical']) == {'customerContacts', 'householdFinance', 'householdCashflow'}
+    assert TestClient(create_app(root, TOKEN)).post('/hosted/worlds', json=legacy, headers=headers()).json()['configuration'] == old['configuration']
+    modern = {**value, 'commandId': str(uuid.uuid4()), 'configuration': {'schemaVersion': physical_setup.VERSION,
+        'physical': {'meterChannels': {'enabled': True, 'amiPercent': 0, 'amrPercent': 0, 'manualPercent': 100,
+                                       'manualReadIntervalDays': 2, 'manualReadSuccess': 1},
+                     'housingAge': {'enabled': True, 'meanAgeYears': 100, 'ageSpreadYears': 0}}}}
+    created = client.post('/hosted/worlds', json=modern, headers=headers()).json()
+    assert created['available'] and created['initialization']['appliedCommands'] == 1
+    base = '/hosted/worlds/' + created['id']
+    assert client.get(base + '/map/snapshot', headers=headers()).json() == snapshot
+    detail = client.get(base + '/premises/P1', headers=headers()).json()['physicalProfiles']
+    assert detail['housing'][0]['age_years'] == 100
+    assert detail['meterCounts'] == {'MANUAL': 3}
+    client.post(base + '/advance', json={'through': '2026-07-17'}, headers=headers()).raise_for_status()
+    readings = client.get(base + '/premises/P1/history', headers=headers()).json()['readings']
+    assert len(readings) == 3
+    assert all(r['intervalStart'] == '2026-07-15' and r['intervalEnd'] == '2026-07-17' for r in readings)
+    assert TestClient(create_app(root, TOKEN)).post('/hosted/worlds', json=modern, headers=headers()).json()['id'] == created['id']

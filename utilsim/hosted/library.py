@@ -23,8 +23,8 @@ def configuration(value):
     if not isinstance(value, dict) or set(value) - {'world', 'physical', 'schemaVersion'}:
         raise ValueError('Unsupported setup group. Use the advertised physical setup schema; geography cannot change.')
     extended = 'physical' in value or 'schemaVersion' in value
-    if extended and value.get('schemaVersion') != setup.VERSION:
-        raise ValueError('Physical policies require schemaVersion ' + setup.VERSION)
+    if extended and value.get('schemaVersion') not in setup.SUPPORTED_VERSIONS:
+        raise ValueError('Physical policies require a supported schemaVersion: ' + ', '.join(setup.SUPPORTED_VERSIONS))
     supplied = value.get('world', {})
     schema, defaults = world_configuration()
     if not isinstance(supplied, dict) or set(supplied) - set(defaults):
@@ -39,7 +39,7 @@ def configuration(value):
             if number < bounds.get('minimum', -math.inf) or number > bounds.get('maximum', math.inf):
                 raise ValueError('World setting outside supported bounds.')
         defaults[group].update(fields)
-    return {'world': defaults, **({'schemaVersion': setup.VERSION, 'physical': setup.normalize(value.get('physical', {}))} if extended else {})}
+    return {'world': defaults, **({'schemaVersion': value['schemaVersion'], 'physical': setup.normalize(value.get('physical', {}), value['schemaVersion'])} if extended else {})}
 
 
 class ManagedWorld(World):
