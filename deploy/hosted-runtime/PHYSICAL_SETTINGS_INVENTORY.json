@@ -1,0 +1,5054 @@
+{
+  "schemaVersion": "physical-settings-inventory/1",
+  "inspectedEngineCommit": "bf82292",
+  "hostedRuntimeCommit": "7cbb4aa",
+  "purpose": "Review inventory only; not a creation payload or published feature declaration",
+  "activeInitialization": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "weather": {
+          "type": "object",
+          "title": "Daily weather",
+          "properties": {
+            "winter_mean_c": {
+              "type": "number",
+              "title": "Winter average",
+              "default": 2.0,
+              "x-unit": "\u00b0C"
+            },
+            "summer_mean_c": {
+              "type": "number",
+              "title": "Summer average",
+              "default": 26.0,
+              "x-unit": "\u00b0C"
+            },
+            "daily_weather_spread_c": {
+              "type": "number",
+              "title": "Daily variation",
+              "default": 6.0,
+              "x-unit": "\u00b0C",
+              "minimum": 0
+            }
+          }
+        },
+        "meters": {
+          "type": "object",
+          "title": "Meter condition",
+          "properties": {
+            "annual_meter_failure": {
+              "type": "number",
+              "title": "Annual base failure probability",
+              "default": 0.015,
+              "x-unit": "",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "annual_meter_drift": {
+              "type": "number",
+              "title": "Annual drift probability",
+              "default": 0.01,
+              "x-unit": "",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "defaults": {
+      "weather": {
+        "winter_mean_c": 2.0,
+        "summer_mean_c": 26.0,
+        "daily_weather_spread_c": 6.0
+      },
+      "meters": {
+        "annual_meter_failure": 0.015,
+        "annual_meter_drift": 0.01
+      }
+    }
+  },
+  "legacyWizardGroups": [
+    {
+      "group": "seeds",
+      "legacyScope": "generation",
+      "fields": [
+        "master",
+        "town",
+        "households",
+        "weather",
+        "incidents",
+        "anomalies"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Master seed and optional per-subsystem re-rolls.",
+        "properties": {
+          "master": {
+            "default": "TOWN-042",
+            "description": "Master seed. Any text or integer; same seed + config + generator version reproduces the same town byte for byte.",
+            "title": "Master",
+            "type": "string",
+            "x-effects": [
+              "everything"
+            ]
+          },
+          "town": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override seed for geography only (roads growth, parcels, buildings).",
+            "title": "Town",
+            "x-advanced": true
+          },
+          "households": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override seed for household attributes (occupants, solar, EV, heating).",
+            "title": "Households",
+            "x-advanced": true
+          },
+          "weather": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override seed for weather series (re-roll storms, keep the town).",
+            "title": "Weather",
+            "x-advanced": true
+          },
+          "incidents": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override seed for incident hazards.",
+            "title": "Incidents",
+            "x-advanced": true
+          },
+          "anomalies": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override seed for the meter-to-cash run (missed reads, anomalies, analyst work, bill checks); a request's run seed overrides it per run.",
+            "title": "Anomalies",
+            "x-advanced": true
+          }
+        },
+        "title": "Seeds",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 0
+      }
+    },
+    {
+      "group": "town",
+      "legacyScope": "generation",
+      "fields": [
+        "houses",
+        "units",
+        "street_pattern",
+        "anchor_lat",
+        "anchor_lon",
+        "timezone",
+        "terrain_relief_m",
+        "terrain_wavelength_m",
+        "arterial_spacing_m",
+        "arterial_warp_m",
+        "collector_block_m",
+        "era_core_year",
+        "era_span_years",
+        "era_noise_years",
+        "park_share",
+        "commercial_strip_m",
+        "commercial_share_arterial",
+        "commercial_share_collector",
+        "commercial_share_local",
+        "commercial_cluster_m",
+        "industrial_lots",
+        "houses_per_school",
+        "margin_m",
+        "corridor_max_deflection_deg",
+        "corridor_name_bonus_deg"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Size, street grid, terrain and land use. Towns are generic: every street comes from these settings and the seed.",
+        "properties": {
+          "houses": {
+            "default": 480,
+            "description": "Number of residential premises to place.",
+            "maximum": 50000,
+            "minimum": 20,
+            "title": "Houses",
+            "type": "integer",
+            "x-effects": [
+              "town extent",
+              "era mix",
+              "substations",
+              "feeders",
+              "pipe sizes",
+              "MRUs"
+            ]
+          },
+          "units": {
+            "default": "ontario",
+            "description": "Display unit profile (stored values are always SI).",
+            "enum": [
+              "ontario",
+              "us",
+              "uk"
+            ],
+            "title": "Units",
+            "type": "string"
+          },
+          "street_pattern": {
+            "default": "legacy",
+            "description": "Original street pattern or connected neighborhood loops and shorter blocks. New towns only.",
+            "enum": [
+              "legacy",
+              "neighborhoods"
+            ],
+            "title": "Street Pattern",
+            "type": "string",
+            "x-effects": [
+              "streets",
+              "blocks",
+              "property locations",
+              "utility routing",
+              "travel routes"
+            ]
+          },
+          "anchor_lat": {
+            "default": 43.3,
+            "description": "Latitude of the town (sun path, day length).",
+            "maximum": 80,
+            "minimum": -80,
+            "title": "Anchor Lat",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "deg"
+          },
+          "anchor_lon": {
+            "default": -80.6,
+            "description": "Longitude of the town.",
+            "maximum": 180,
+            "minimum": -180,
+            "title": "Anchor Lon",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "deg"
+          },
+          "timezone": {
+            "default": "America/Toronto",
+            "description": "IANA timezone of the town (read schedules, billing calendar, day/night).",
+            "title": "Timezone",
+            "type": "string"
+          },
+          "terrain_relief_m": {
+            "default": 15.0,
+            "description": "Peak-to-trough terrain relief.",
+            "maximum": 120,
+            "minimum": 0,
+            "title": "Terrain Relief M",
+            "type": "number",
+            "x-effects": [
+              "water pressure zones",
+              "PRVs",
+              "tank siting"
+            ],
+            "x-unit": "m"
+          },
+          "terrain_wavelength_m": {
+            "default": 900.0,
+            "description": "Dominant wavelength of terrain undulation.",
+            "maximum": 5000,
+            "minimum": 100,
+            "title": "Terrain Wavelength M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "arterial_spacing_m": {
+            "default": 1400.0,
+            "description": "Mean spacing of arterial roads (concession-grid style).",
+            "maximum": 2400,
+            "minimum": 600,
+            "title": "Arterial Spacing M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "arterial_warp_m": {
+            "default": 130.0,
+            "description": "Amplitude of the smooth warp applied to arterials.",
+            "maximum": 400,
+            "minimum": 0,
+            "title": "Arterial Warp M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "collector_block_m": {
+            "default": 650.0,
+            "description": "Superblocks larger than this get a collector road.",
+            "maximum": 1500,
+            "minimum": 250,
+            "title": "Collector Block M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "era_core_year": {
+            "default": 1925,
+            "description": "Construction year at the town centre.",
+            "maximum": 2020,
+            "minimum": 1850,
+            "title": "Era Core Year",
+            "type": "integer",
+            "x-effects": [
+              "street pattern",
+              "lot sizes",
+              "overhead vs underground electric",
+              "legacy gas district",
+              "cast-iron water mains",
+              "solar/EV uptake"
+            ]
+          },
+          "era_span_years": {
+            "default": 85,
+            "description": "Years added from centre to edge (era = core + span\u00b7(d/R)^1.2 + noise).",
+            "maximum": 150,
+            "minimum": 0,
+            "title": "Era Span Years",
+            "type": "integer"
+          },
+          "era_noise_years": {
+            "default": 8.0,
+            "description": "Std-dev of era noise per district.",
+            "maximum": 30,
+            "minimum": 0,
+            "title": "Era Noise Years",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "yr"
+          },
+          "park_share": {
+            "default": 0.04,
+            "description": "Share of blocks kept as parks.",
+            "maximum": 0.2,
+            "minimum": 0,
+            "title": "Park Share",
+            "type": "number",
+            "x-advanced": true
+          },
+          "commercial_strip_m": {
+            "default": 700.0,
+            "description": "Length of the downtown main street: arterial frontage within half this distance of the centre is all commercial (up to 80 lots). The frontage shares below apply beyond it.",
+            "maximum": 3000,
+            "minimum": 0,
+            "title": "Commercial Strip M",
+            "type": "number",
+            "x-effects": [
+              "downtown storefronts",
+              "homes pushed outward"
+            ],
+            "x-unit": "m"
+          },
+          "commercial_share_arterial": {
+            "default": 0.45,
+            "description": "Share of developed lots fronting an arterial (beyond the downtown main street) that become commercial or mixed-use premises. The rest are homes, or rear yards where modern subdivisions back onto the arterial.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Commercial Share Arterial",
+            "type": "number",
+            "x-effects": [
+              "commercial premises",
+              "plazas at major intersections",
+              "commercial hydrant spacing",
+              "transformer pads",
+              "commercial accounts"
+            ]
+          },
+          "commercial_share_collector": {
+            "default": 0.15,
+            "description": "Share of developed lots fronting a collector that become commercial or mixed-use premises.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Commercial Share Collector",
+            "type": "number",
+            "x-effects": [
+              "commercial premises",
+              "corner shops on collectors",
+              "commercial accounts"
+            ]
+          },
+          "commercial_share_local": {
+            "default": 0.02,
+            "description": "Share of developed lots on local streets that become commercial (corner stores near downtown and where local streets meet main roads).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Commercial Share Local",
+            "type": "number",
+            "x-effects": [
+              "commercial premises",
+              "homes pushed outward"
+            ]
+          },
+          "commercial_cluster_m": {
+            "default": 120.0,
+            "description": "Distance over which commercial frontage clusters around main-road intersections and downtown. Smaller gives tight corner clusters, larger gives long strips.",
+            "maximum": 1000,
+            "minimum": 20,
+            "title": "Commercial Cluster M",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "where storefronts sit along main roads"
+            ],
+            "x-unit": "m"
+          },
+          "industrial_lots": {
+            "default": 2,
+            "description": "Number of large industrial customers.",
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Industrial Lots",
+            "type": "integer"
+          },
+          "houses_per_school": {
+            "default": 2500,
+            "description": "One school per this many houses.",
+            "maximum": 20000,
+            "minimum": 500,
+            "title": "Houses Per School",
+            "type": "integer",
+            "x-advanced": true
+          },
+          "margin_m": {
+            "default": 120.0,
+            "description": "Empty margin around the developed area.",
+            "maximum": 1000,
+            "minimum": 0,
+            "title": "Margin M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "corridor_max_deflection_deg": {
+            "default": 35.0,
+            "description": "Arterial/collector road edges continue one corridor through a junction when the heading changes by at most this much.",
+            "maximum": 90,
+            "minimum": 5,
+            "title": "Corridor Max Deflection Deg",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "corridors",
+              "trunk routes",
+              "corridor changes"
+            ],
+            "x-unit": "deg"
+          },
+          "corridor_name_bonus_deg": {
+            "default": 20.0,
+            "description": "Extra deflection allowed when both edges carry the same street name (a name is weak evidence of continuity).",
+            "maximum": 60,
+            "minimum": 0,
+            "title": "Corridor Name Bonus Deg",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "corridors"
+            ],
+            "x-unit": "deg"
+          }
+        },
+        "title": "Town & geography",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 1
+      }
+    },
+    {
+      "group": "housing",
+      "legacyScope": "generation",
+      "fields": [
+        "lot_frontage_m",
+        "lot_depth_m",
+        "setback_m",
+        "two_storey_share",
+        "occupancy_rate",
+        "rental_share",
+        "household_size_weights",
+        "solar_rate",
+        "pv_kw_min",
+        "pv_kw_max",
+        "ev_rate",
+        "electric_heat_rate",
+        "heat_pump_share_of_electric",
+        "ac_rate",
+        "pool_rate",
+        "irrigation_rate"
+      ],
+      "schema": {
+        "$defs": {
+          "EraValues": {
+            "additionalProperties": false,
+            "description": "A value per construction era: pre-1945 core, 1945\u20131978 post-war, post-1978 modern subdivisions.",
+            "properties": {
+              "pre_1945": {
+                "title": "Pre 1945",
+                "type": "number"
+              },
+              "postwar": {
+                "title": "Postwar",
+                "type": "number"
+              },
+              "modern": {
+                "title": "Modern",
+                "type": "number"
+              }
+            },
+            "required": [
+              "pre_1945",
+              "postwar",
+              "modern"
+            ],
+            "title": "EraValues",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Lots, buildings and the people and appliances inside them.",
+        "properties": {
+          "lot_frontage_m": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 15.0,
+              "postwar": 18.5,
+              "modern": 16.5
+            },
+            "description": "Mean lot frontage by era.",
+            "x-effects": [
+              "houses per km of street"
+            ],
+            "x-unit": "m"
+          },
+          "lot_depth_m": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 36.0,
+              "postwar": 35.0,
+              "modern": 33.0
+            },
+            "description": "Mean lot depth by era.",
+            "x-unit": "m"
+          },
+          "setback_m": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 6.0,
+              "postwar": 7.5,
+              "modern": 6.5
+            },
+            "description": "Front setback by era.",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "two_storey_share": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 0.7,
+              "postwar": 0.25,
+              "modern": 0.75
+            },
+            "description": "Share of two-storey houses by era."
+          },
+          "occupancy_rate": {
+            "default": 0.955,
+            "description": "Share of premises occupied at simulation start.",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Occupancy Rate",
+            "type": "number",
+            "x-effects": [
+              "vacant consumption",
+              "VEE vacancy signals",
+              "move-ins"
+            ]
+          },
+          "rental_share": {
+            "default": 0.28,
+            "description": "Share of premises that are rentals (more contract turnover).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Rental Share",
+            "type": "number",
+            "x-effects": [
+              "move-in/out frequency",
+              "contract history"
+            ]
+          },
+          "household_size_weights": {
+            "default": [
+              0.28,
+              0.34,
+              0.15,
+              0.15,
+              0.06,
+              0.02
+            ],
+            "description": "Relative frequency of households with 1..6 occupants.",
+            "items": {
+              "type": "number"
+            },
+            "title": "Household Size Weights",
+            "type": "array",
+            "x-advanced": true
+          },
+          "solar_rate": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 0.06,
+              "postwar": 0.1,
+              "modern": 0.18
+            },
+            "description": "Share of houses with rooftop PV by era.",
+            "x-effects": [
+              "export registers",
+              "midday reverse flow",
+              "net-metering credits"
+            ]
+          },
+          "pv_kw_min": {
+            "default": 4.0,
+            "description": "Smallest rooftop PV system.",
+            "maximum": 20,
+            "minimum": 0.5,
+            "title": "Pv Kw Min",
+            "type": "number",
+            "x-unit": "kW"
+          },
+          "pv_kw_max": {
+            "default": 9.5,
+            "description": "Largest rooftop PV system.",
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Pv Kw Max",
+            "type": "number",
+            "x-unit": "kW"
+          },
+          "ev_rate": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 0.05,
+              "postwar": 0.07,
+              "modern": 0.12
+            },
+            "description": "Share of houses with an EV charger.",
+            "x-effects": [
+              "transformer loading",
+              "evening peak"
+            ]
+          },
+          "electric_heat_rate": {
+            "$ref": "#/$defs/EraValues",
+            "default": {
+              "pre_1945": 0.1,
+              "postwar": 0.14,
+              "modern": 0.18
+            },
+            "description": "Share of houses heated electrically (baseboard or heat pump) where gas is available. All houses in all-electric districts are electric.",
+            "x-effects": [
+              "gas service count",
+              "winter electric peak"
+            ]
+          },
+          "heat_pump_share_of_electric": {
+            "default": 0.55,
+            "description": "Share of electric heating that is a heat pump (vs baseboard).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Heat Pump Share Of Electric",
+            "type": "number",
+            "x-advanced": true
+          },
+          "ac_rate": {
+            "default": 0.85,
+            "description": "Share of houses with central air conditioning.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Ac Rate",
+            "type": "number",
+            "x-effects": [
+              "summer peak",
+              "transformer sizing"
+            ]
+          },
+          "pool_rate": {
+            "default": 0.06,
+            "description": "Share of houses (on lots > 600 m\u00b2) with a pool.",
+            "maximum": 0.5,
+            "minimum": 0,
+            "title": "Pool Rate",
+            "type": "number",
+            "x-advanced": true
+          },
+          "irrigation_rate": {
+            "default": 0.3,
+            "description": "Share of houses that irrigate lawns in summer.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Irrigation Rate",
+            "type": "number",
+            "x-effects": [
+              "summer water peak"
+            ]
+          }
+        },
+        "title": "Housing & households",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 2
+      }
+    },
+    {
+      "group": "electric",
+      "legacyScope": "generation",
+      "fields": [
+        "primary_kv",
+        "secondary_v",
+        "kva_per_100m2",
+        "kva_ac",
+        "kva_electric_heat",
+        "kva_heat_pump",
+        "kva_ev",
+        "kva_pool",
+        "coincidence_floor",
+        "transformer_kva_steps",
+        "transformer_max_loading",
+        "conductor_planning_margin",
+        "max_houses_per_transformer_overhead",
+        "max_houses_per_transformer_underground",
+        "feeder_design_mva",
+        "feeder_max_customers",
+        "min_feeders_per_substation",
+        "substation_mva",
+        "route_weight_arterial",
+        "route_weight_collector",
+        "route_weight_local",
+        "route_turn_penalty_m",
+        "route_corridor_change_penalty_m",
+        "route_hierarchy_penalty_m",
+        "trunk_min_load_share",
+        "route_shared_trunk_factor",
+        "ties_per_feeder_pair",
+        "tie_max_length_m",
+        "section_max_share",
+        "section_min_customers",
+        "overhead_before_year",
+        "pole_spacing_m",
+        "voltage_min_pu",
+        "voltage_max_pu"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Bulk supply, substations, feeders, transformers, services.",
+        "properties": {
+          "primary_kv": {
+            "default": 13.8,
+            "description": "Primary distribution line-to-line voltage (Ontario urban 13.8 kV; US 12.47 kV).",
+            "maximum": 34.5,
+            "minimum": 4.16,
+            "title": "Primary Kv",
+            "type": "number",
+            "x-effects": [
+              "feeder capacity",
+              "conductor sizing"
+            ],
+            "x-unit": "kV"
+          },
+          "secondary_v": {
+            "default": 240.0,
+            "description": "Split-phase secondary voltage (120/240 V).",
+            "maximum": 480,
+            "minimum": 120,
+            "title": "Secondary V",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "V"
+          },
+          "kva_per_100m2": {
+            "default": 1.0,
+            "description": "Individual peak demand per 100 m\u00b2 of floor area (lighting, plug, appliances).",
+            "maximum": 5,
+            "minimum": 0.2,
+            "title": "Kva Per 100M2",
+            "type": "number",
+            "x-effects": [
+              "transformer sizing"
+            ],
+            "x-unit": "kVA"
+          },
+          "kva_ac": {
+            "default": 3.5,
+            "description": "Added peak for central air conditioning.",
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Kva Ac",
+            "type": "number",
+            "x-unit": "kVA"
+          },
+          "kva_electric_heat": {
+            "default": 6.0,
+            "description": "Added peak for electric resistance heat.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Kva Electric Heat",
+            "type": "number",
+            "x-unit": "kVA"
+          },
+          "kva_heat_pump": {
+            "default": 4.0,
+            "description": "Added peak for a heat pump.",
+            "maximum": 15,
+            "minimum": 0,
+            "title": "Kva Heat Pump",
+            "type": "number",
+            "x-unit": "kVA"
+          },
+          "kva_ev": {
+            "default": 7.2,
+            "description": "Added peak for a Level-2 EV charger.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Kva Ev",
+            "type": "number",
+            "x-unit": "kVA"
+          },
+          "kva_pool": {
+            "default": 1.5,
+            "description": "Added peak for a pool pump/heater.",
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Kva Pool",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "kVA"
+          },
+          "coincidence_floor": {
+            "default": 0.33,
+            "description": "Coincidence factor CF(n) = a + (1-a)/\u221an; a is the floor as n \u2192 \u221e.",
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "title": "Coincidence Floor",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "every electric size"
+            ]
+          },
+          "transformer_kva_steps": {
+            "default": [
+              25,
+              50,
+              75,
+              100,
+              167
+            ],
+            "description": "Single-phase transformer sizes.",
+            "items": {
+              "type": "number"
+            },
+            "title": "Transformer Kva Steps",
+            "type": "array",
+            "x-advanced": true,
+            "x-unit": "kVA"
+          },
+          "transformer_max_loading": {
+            "default": 1.3,
+            "description": "Allowed peak loading relative to nameplate.",
+            "maximum": 2.0,
+            "minimum": 0.8,
+            "title": "Transformer Max Loading",
+            "type": "number",
+            "x-advanced": true
+          },
+          "conductor_planning_margin": {
+            "default": 1.25,
+            "description": "Primary conductors are sized for design load \u00d7 this margin (winter peaks, load growth).",
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "title": "Conductor Planning Margin",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "primary conductor sizes",
+              "loading in power flow"
+            ]
+          },
+          "max_houses_per_transformer_overhead": {
+            "default": 6,
+            "description": "Max houses on a pole-mount transformer.",
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Max Houses Per Transformer Overhead",
+            "type": "integer"
+          },
+          "max_houses_per_transformer_underground": {
+            "default": 10,
+            "description": "Max houses on a pad-mount transformer.",
+            "maximum": 25,
+            "minimum": 1,
+            "title": "Max Houses Per Transformer Underground",
+            "type": "integer"
+          },
+          "feeder_design_mva": {
+            "default": 6.0,
+            "description": "Design peak per feeder.",
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Feeder Design Mva",
+            "type": "number",
+            "x-effects": [
+              "feeder count",
+              "tie switches"
+            ],
+            "x-unit": "MVA"
+          },
+          "feeder_max_customers": {
+            "default": 1200,
+            "description": "Most customers planned on one feeder (limits how many lose supply when a feeder breaker trips).",
+            "maximum": 10000,
+            "minimum": 100,
+            "title": "Feeder Max Customers",
+            "type": "integer",
+            "x-effects": [
+              "feeder count",
+              "feeder territories",
+              "tie switches"
+            ]
+          },
+          "min_feeders_per_substation": {
+            "default": 2,
+            "description": "Feeders leaving each substation at least (fewer only when it serves fewer transformer groups), so normally-open ties can back-feed.",
+            "maximum": 12,
+            "minimum": 1,
+            "title": "Min Feeders Per Substation",
+            "type": "integer",
+            "x-effects": [
+              "feeder count",
+              "tie switches",
+              "outage size"
+            ]
+          },
+          "substation_mva": {
+            "default": 25.0,
+            "description": "Firm capacity per substation.",
+            "maximum": 100,
+            "minimum": 5,
+            "title": "Substation Mva",
+            "type": "number",
+            "x-effects": [
+              "substation count"
+            ],
+            "x-unit": "MVA"
+          },
+          "route_weight_arterial": {
+            "default": 1.0,
+            "description": "Feeder routing cost per metre along an arterial (trunks follow the cheapest corridors).",
+            "maximum": 10,
+            "minimum": 0.1,
+            "title": "Route Weight Arterial",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunk routes",
+              "feeder territories"
+            ]
+          },
+          "route_weight_collector": {
+            "default": 1.4,
+            "description": "Feeder routing cost per metre along a collector.",
+            "maximum": 10,
+            "minimum": 0.1,
+            "title": "Route Weight Collector",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunk routes"
+            ]
+          },
+          "route_weight_local": {
+            "default": 2.0,
+            "description": "Feeder routing cost per metre along a local street.",
+            "maximum": 10,
+            "minimum": 0.1,
+            "title": "Route Weight Local",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunk routes",
+              "lateral routes"
+            ]
+          },
+          "route_turn_penalty_m": {
+            "default": 60.0,
+            "description": "Routing cost of a 90\u00b0 turn, in weighted metres; it grows with the square of the angle (a U-turn costs 4\u00d7). Bends under 10\u00b0 are free.",
+            "maximum": 2000,
+            "minimum": 0,
+            "title": "Route Turn Penalty M",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunk continuity",
+              "severe turns"
+            ],
+            "x-unit": "m"
+          },
+          "route_corridor_change_penalty_m": {
+            "default": 80.0,
+            "description": "Routing cost of switching from one arterial/collector corridor to another.",
+            "maximum": 2000,
+            "minimum": 0,
+            "title": "Route Corridor Change Penalty M",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunk continuity",
+              "corridor changes"
+            ],
+            "x-unit": "m"
+          },
+          "route_hierarchy_penalty_m": {
+            "default": 60.0,
+            "description": "Routing cost per step up or down the road hierarchy (arterial \u2194 collector \u2194 local).",
+            "maximum": 2000,
+            "minimum": 0,
+            "title": "Route Hierarchy Penalty M",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunks staying on main roads"
+            ],
+            "x-unit": "m"
+          },
+          "trunk_min_load_share": {
+            "default": 0.04,
+            "description": "A feeder trunk extends along a corridor while at least this share of the feeder's connected load lies at or beyond that point; smaller tails are served by laterals.",
+            "maximum": 0.5,
+            "minimum": 0,
+            "title": "Trunk Min Load Share",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "trunk length",
+              "three-phase backbone"
+            ]
+          },
+          "route_shared_trunk_factor": {
+            "default": 1.2,
+            "description": "Cost multiplier for running a feeder express through another feeder's territory or alongside its trunk.",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Route Shared Trunk Factor",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "express sections",
+              "feeder separation"
+            ]
+          },
+          "ties_per_feeder_pair": {
+            "default": 1,
+            "description": "Normally-open tie switches between each pair of neighbouring feeders (0: no ties at all, section ties included).",
+            "maximum": 4,
+            "minimum": 0,
+            "title": "Ties Per Feeder Pair",
+            "type": "integer",
+            "x-effects": [
+              "tie switches",
+              "back-feed options"
+            ]
+          },
+          "tie_max_length_m": {
+            "default": 1200.0,
+            "description": "Longest new line built for a tie: to a feeder that touches no other feeder, or from a switched section to another feeder's three-phase line (or round to its own feeder's). Along a street a line already uses, a metre counts 1.25 (single-phase) or 2 (three-phase).",
+            "maximum": 5000,
+            "minimum": 0,
+            "title": "Tie Max Length M",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "tie switches",
+              "back-feed options"
+            ],
+            "x-unit": "m"
+          },
+          "section_max_share": {
+            "default": 0.15,
+            "description": "Sectionalising switches cut each feeder's three-phase backbone into sections of at most this share of the feeder's customers (at least section_min_customers), so a crew isolates a fault within a bounded section and ties back-feed the healthy sections beyond it.",
+            "maximum": 1.0,
+            "minimum": 0.05,
+            "title": "Section Max Share",
+            "type": "number",
+            "x-effects": [
+              "sectionalising switches",
+              "tie switches",
+              "outage size after isolation"
+            ]
+          },
+          "section_min_customers": {
+            "default": 100,
+            "description": "Smallest section limit: a feeder is not cut into sections smaller than this many customers.",
+            "maximum": 5000,
+            "minimum": 10,
+            "title": "Section Min Customers",
+            "type": "integer",
+            "x-advanced": true,
+            "x-effects": [
+              "sectionalising switches",
+              "outage size after isolation"
+            ]
+          },
+          "overhead_before_year": {
+            "default": 1978,
+            "description": "Districts built before this year are overhead (poles); later underground.",
+            "maximum": 2030,
+            "minimum": 1850,
+            "title": "Overhead Before Year",
+            "type": "integer",
+            "x-effects": [
+              "poles",
+              "lightning exposure",
+              "storm outages"
+            ]
+          },
+          "pole_spacing_m": {
+            "default": 42.0,
+            "description": "Pole span on overhead lines.",
+            "maximum": 90,
+            "minimum": 20,
+            "title": "Pole Spacing M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "voltage_min_pu": {
+            "default": 0.95,
+            "description": "Lower service voltage limit (CSA CAN3-C235 / ANSI Range A). Frames report it on a 120 V base (premises.voltageLimits) with the premises below it; less 4 V it is the default floor for back-feeding through a tie.",
+            "maximum": 1.0,
+            "minimum": 0.85,
+            "title": "Voltage Min Pu",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "low-voltage premises",
+              "voltage lens",
+              "back-feed voltage floor"
+            ]
+          },
+          "voltage_max_pu": {
+            "default": 1.05,
+            "description": "Upper service voltage limit (premises.voltageLimits in frames).",
+            "maximum": 1.15,
+            "minimum": 1.0,
+            "title": "Voltage Max Pu",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "high-voltage premises",
+              "voltage lens"
+            ]
+          }
+        },
+        "title": "Electric distribution",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 3
+      }
+    },
+    {
+      "group": "gas",
+      "legacyScope": "generation",
+      "fields": [
+        "all_electric_district_share",
+        "scheme",
+        "transmission_kpa",
+        "mp_kpa",
+        "lp_kpa",
+        "lp_core_before_year",
+        "design_m3h_base",
+        "design_m3h_per_m2",
+        "coincidence_floor",
+        "min_main_mm",
+        "valve_spacing_m",
+        "calorific_mj_per_m3",
+        "base_pressure_kpa",
+        "base_temperature_c"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "City gate, mains, regulators and services.",
+        "properties": {
+          "all_electric_district_share": {
+            "default": 0.15,
+            "description": "Share of districts with no gas mains (all-electric).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "All Electric District Share",
+            "type": "number",
+            "x-effects": [
+              "gas services",
+              "electric heat share",
+              "winter electric peak"
+            ]
+          },
+          "scheme": {
+            "default": "mp_with_lp_core",
+            "description": "Medium-pressure PE everywhere with a regulator at every meter, optionally with a legacy low-pressure core fed by district regulators.",
+            "enum": [
+              "mp",
+              "mp_with_lp_core"
+            ],
+            "title": "Scheme",
+            "type": "string"
+          },
+          "transmission_kpa": {
+            "default": 3800.0,
+            "description": "Off-map transmission pressure at the city gate inlet.",
+            "maximum": 10000,
+            "minimum": 700,
+            "title": "Transmission Kpa",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "kPa"
+          },
+          "mp_kpa": {
+            "default": 414.0,
+            "description": "Medium-pressure distribution set point (60 psig).",
+            "maximum": 700,
+            "minimum": 35,
+            "title": "Mp Kpa",
+            "type": "number",
+            "x-unit": "kPa"
+          },
+          "lp_kpa": {
+            "default": 1.74,
+            "description": "Low-pressure legacy main set point (7 in w.c.).",
+            "maximum": 7,
+            "minimum": 0.5,
+            "title": "Lp Kpa",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "kPa"
+          },
+          "lp_core_before_year": {
+            "default": 1945,
+            "description": "Districts built before this year are on the low-pressure system.",
+            "maximum": 2000,
+            "minimum": 1850,
+            "title": "Lp Core Before Year",
+            "type": "integer",
+            "x-advanced": true
+          },
+          "design_m3h_base": {
+            "default": 1.15,
+            "description": "Design-hour demand per house, base component (\u2248 40 CFH).",
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Design M3H Base",
+            "type": "number",
+            "x-unit": "m3/h"
+          },
+          "design_m3h_per_m2": {
+            "default": 0.017,
+            "description": "Design-hour demand per m\u00b2 of floor area (\u2248 0.6 CFH/m\u00b2).",
+            "maximum": 0.2,
+            "minimum": 0,
+            "title": "Design M3H Per M2",
+            "type": "number",
+            "x-unit": "m3/h"
+          },
+          "coincidence_floor": {
+            "default": 0.5,
+            "description": "Gas coincidence factor floor a in CF(n) = a + (1-a)/\u221an.",
+            "maximum": 1,
+            "minimum": 0.1,
+            "title": "Coincidence Floor",
+            "type": "number",
+            "x-advanced": true
+          },
+          "min_main_mm": {
+            "default": 50,
+            "description": "Smallest distribution main (2-inch PE).",
+            "maximum": 150,
+            "minimum": 25,
+            "title": "Min Main Mm",
+            "type": "integer",
+            "x-unit": "mm"
+          },
+          "valve_spacing_m": {
+            "default": 800.0,
+            "description": "Maximum spacing of main valves on feeders.",
+            "maximum": 3000,
+            "minimum": 100,
+            "title": "Valve Spacing M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "calorific_mj_per_m3": {
+            "default": 37.5,
+            "description": "Higher heating value used for energy conversion (therm/kWh display and billing).",
+            "maximum": 45,
+            "minimum": 30,
+            "title": "Calorific Mj Per M3",
+            "type": "number",
+            "x-effects": [
+              "gas bill energy",
+              "therm/kWh conversion"
+            ],
+            "x-unit": "MJ/m3"
+          },
+          "base_pressure_kpa": {
+            "default": 101.559771,
+            "description": "Base pressure for standard volume: the Weymouth base pressure in gas main sizing and pressures (default 14.73 psia).",
+            "maximum": 110,
+            "minimum": 90,
+            "title": "Base Pressure Kpa",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "gas main sizes",
+              "gas pressures"
+            ],
+            "x-unit": "kPa"
+          },
+          "base_temperature_c": {
+            "default": 15.738889,
+            "description": "Base temperature for standard volume: the Weymouth base temperature (default 520 \u00b0R, about 60 \u00b0F).",
+            "maximum": 25,
+            "minimum": 0,
+            "title": "Base Temperature C",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "gas main sizes",
+              "gas pressures"
+            ],
+            "x-unit": "C"
+          }
+        },
+        "title": "Natural gas",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 4
+      }
+    },
+    {
+      "group": "water",
+      "legacyScope": "generation",
+      "fields": [
+        "lpcd",
+        "irrigation_m3_per_day",
+        "max_day_factor",
+        "peak_hour_factor",
+        "fire_flow_residential_lps",
+        "fire_flow_commercial_lps",
+        "fire_flow_industrial_lps",
+        "min_main_mm",
+        "collector_main_mm",
+        "arterial_main_mm",
+        "hw_c_new",
+        "hw_c_old",
+        "cast_iron_before_year",
+        "tank_overflow_above_ground_m",
+        "zone_band_m",
+        "hydrant_spacing_m",
+        "hydrant_spacing_commercial_m",
+        "valve_spacing_m",
+        "pump_units"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Supply, pumping, storage, mains, hydrants and services.",
+        "properties": {
+          "lpcd": {
+            "default": 220.0,
+            "description": "Indoor residential use per person per day.",
+            "maximum": 600,
+            "minimum": 50,
+            "title": "Lpcd",
+            "type": "number",
+            "x-effects": [
+              "water bills",
+              "peak flow"
+            ],
+            "x-unit": "L"
+          },
+          "irrigation_m3_per_day": {
+            "default": 0.6,
+            "description": "Summer irrigation per irrigating house.",
+            "maximum": 5,
+            "minimum": 0,
+            "title": "Irrigation M3 Per Day",
+            "type": "number",
+            "x-unit": "m3"
+          },
+          "max_day_factor": {
+            "default": 2.0,
+            "description": "Max-day / average-day ratio.",
+            "maximum": 4,
+            "minimum": 1,
+            "title": "Max Day Factor",
+            "type": "number",
+            "x-advanced": true
+          },
+          "peak_hour_factor": {
+            "default": 3.0,
+            "description": "Peak-hour / average-day ratio.",
+            "maximum": 6,
+            "minimum": 1,
+            "title": "Peak Hour Factor",
+            "type": "number",
+            "x-advanced": true
+          },
+          "fire_flow_residential_lps": {
+            "default": 63.0,
+            "description": "Required residential fire flow (1,000 USgpm).",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Fire Flow Residential Lps",
+            "type": "number",
+            "x-effects": [
+              "minimum main size",
+              "hydrants"
+            ],
+            "x-unit": "L/s"
+          },
+          "fire_flow_commercial_lps": {
+            "default": 95.0,
+            "description": "Required commercial/institutional fire flow.",
+            "maximum": 300,
+            "minimum": 0,
+            "title": "Fire Flow Commercial Lps",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "L/s"
+          },
+          "fire_flow_industrial_lps": {
+            "default": 190.0,
+            "description": "Required industrial fire flow.",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Fire Flow Industrial Lps",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "L/s"
+          },
+          "min_main_mm": {
+            "default": 150,
+            "description": "Smallest main where hydrants are attached.",
+            "maximum": 300,
+            "minimum": 100,
+            "title": "Min Main Mm",
+            "type": "integer",
+            "x-unit": "mm"
+          },
+          "collector_main_mm": {
+            "default": 300,
+            "description": "Minimum main on collector roads.",
+            "maximum": 600,
+            "minimum": 150,
+            "title": "Collector Main Mm",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "mm"
+          },
+          "arterial_main_mm": {
+            "default": 400,
+            "description": "Minimum transmission main on arterials leaving the pump station.",
+            "maximum": 900,
+            "minimum": 200,
+            "title": "Arterial Main Mm",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "mm"
+          },
+          "hw_c_new": {
+            "default": 130.0,
+            "description": "Hazen-Williams C for PVC/ductile iron mains.",
+            "maximum": 150,
+            "minimum": 60,
+            "title": "Hw C New",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "head loss",
+              "service pressure"
+            ]
+          },
+          "hw_c_old": {
+            "default": 100.0,
+            "description": "Hazen-Williams C for unlined cast iron mains.",
+            "maximum": 140,
+            "minimum": 40,
+            "title": "Hw C Old",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "head loss",
+              "service pressure"
+            ]
+          },
+          "cast_iron_before_year": {
+            "default": 1960,
+            "description": "Mains along streets built before this year are unlined cast iron (the concrete trunk excepted).",
+            "maximum": 2000,
+            "minimum": 1850,
+            "title": "Cast Iron Before Year",
+            "type": "integer",
+            "x-effects": [
+              "cast-iron mains",
+              "main break rate (\u00d72)",
+              "head loss"
+            ]
+          },
+          "tank_overflow_above_ground_m": {
+            "default": 42.0,
+            "description": "Elevated tank overflow height above the highest service in its zone.",
+            "maximum": 80,
+            "minimum": 20,
+            "title": "Tank Overflow Above Ground M",
+            "type": "number",
+            "x-effects": [
+              "service pressure"
+            ],
+            "x-unit": "m"
+          },
+          "zone_band_m": {
+            "default": 28.0,
+            "description": "Elevation band per pressure zone.",
+            "maximum": 60,
+            "minimum": 10,
+            "title": "Zone Band M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "hydrant_spacing_m": {
+            "default": 150.0,
+            "description": "Hydrant spacing on residential mains.",
+            "maximum": 300,
+            "minimum": 50,
+            "title": "Hydrant Spacing M",
+            "type": "number",
+            "x-unit": "m"
+          },
+          "hydrant_spacing_commercial_m": {
+            "default": 90.0,
+            "description": "Hydrant spacing in commercial areas.",
+            "maximum": 200,
+            "minimum": 40,
+            "title": "Hydrant Spacing Commercial M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "valve_spacing_m": {
+            "default": 240.0,
+            "description": "Maximum spacing between line valves.",
+            "maximum": 600,
+            "minimum": 60,
+            "title": "Valve Spacing M",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "m"
+          },
+          "pump_units": {
+            "default": 3,
+            "description": "Pumps at the booster station (one is standby).",
+            "maximum": 8,
+            "minimum": 1,
+            "title": "Pump Units",
+            "type": "integer",
+            "x-advanced": true
+          }
+        },
+        "title": "Water distribution",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 5
+      }
+    },
+    {
+      "group": "ami",
+      "legacyScope": "generation",
+      "fields": [
+        "ami_route_share",
+        "amr_route_share",
+        "collector_radius_m",
+        "poll_start_hour",
+        "poll_end_hour",
+        "meter_digits_electric",
+        "meter_digits_water",
+        "meter_digits_gas"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Meter technology mix, AMI collectors and nightly collection.",
+        "properties": {
+          "ami_route_share": {
+            "default": 0.6,
+            "description": "Share of meter reading routes converted to AMI.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Ami Route Share",
+            "type": "number",
+            "x-effects": [
+              "meter vans",
+              "manual reads",
+              "estimates",
+              "VEE comm-fail flags"
+            ]
+          },
+          "amr_route_share": {
+            "default": 0.25,
+            "description": "Share of routes read by drive-by AMR vans (rest are walked manually).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Amr Route Share",
+            "type": "number",
+            "x-effects": [
+              "van routes",
+              "walker routes"
+            ]
+          },
+          "collector_radius_m": {
+            "default": 900.0,
+            "description": "AMI collector coverage radius.",
+            "maximum": 3000,
+            "minimum": 200,
+            "title": "Collector Radius M",
+            "type": "number",
+            "x-effects": [
+              "collector count",
+              "comm-fail clusters"
+            ],
+            "x-unit": "m"
+          },
+          "poll_start_hour": {
+            "default": 1.0,
+            "description": "Nightly head-end poll window start (local time).",
+            "maximum": 24,
+            "minimum": 0,
+            "title": "Poll Start Hour",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "poll_end_hour": {
+            "default": 4.0,
+            "description": "Nightly head-end poll window end.",
+            "maximum": 24,
+            "minimum": 0,
+            "title": "Poll End Hour",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "meter_digits_electric": {
+            "default": 6,
+            "description": "Register digits on electric meters (rollover at 10^digits).",
+            "maximum": 9,
+            "minimum": 4,
+            "title": "Meter Digits Electric",
+            "type": "integer",
+            "x-advanced": true
+          },
+          "meter_digits_water": {
+            "default": 6,
+            "description": "Register digits on water meters.",
+            "maximum": 9,
+            "minimum": 4,
+            "title": "Meter Digits Water",
+            "type": "integer",
+            "x-advanced": true
+          },
+          "meter_digits_gas": {
+            "default": 5,
+            "description": "Register digits on gas meters.",
+            "maximum": 9,
+            "minimum": 4,
+            "title": "Meter Digits Gas",
+            "type": "integer",
+            "x-advanced": true
+          }
+        },
+        "title": "Metering & AMI",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 6
+      }
+    },
+    {
+      "group": "weather",
+      "legacyScope": "generation",
+      "fields": [
+        "winter",
+        "spring",
+        "summer",
+        "fall",
+        "persistence",
+        "storm_days_per_year",
+        "heating_base_c",
+        "cooling_base_c"
+      ],
+      "schema": {
+        "$defs": {
+          "SeasonTemp": {
+            "additionalProperties": false,
+            "properties": {
+              "mean_c": {
+                "title": "Mean C",
+                "type": "number"
+              },
+              "sd_c": {
+                "title": "Sd C",
+                "type": "number"
+              },
+              "min_c": {
+                "title": "Min C",
+                "type": "number"
+              },
+              "max_c": {
+                "title": "Max C",
+                "type": "number"
+              }
+            },
+            "required": [
+              "mean_c",
+              "sd_c",
+              "min_c",
+              "max_c"
+            ],
+            "title": "SeasonTemp",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Seeded daily weather. Drives magnitudes and volumes, never process structure.",
+        "properties": {
+          "winter": {
+            "$ref": "#/$defs/SeasonTemp",
+            "default": {
+              "mean_c": -4.5,
+              "sd_c": 6.5,
+              "min_c": -28.0,
+              "max_c": 12.0
+            },
+            "description": "Winter (Dec 21\u2013Mar 20)."
+          },
+          "spring": {
+            "$ref": "#/$defs/SeasonTemp",
+            "default": {
+              "mean_c": 9.0,
+              "sd_c": 6.0,
+              "min_c": -8.0,
+              "max_c": 30.0
+            },
+            "description": "Spring (Mar 21\u2013Jun 20)."
+          },
+          "summer": {
+            "$ref": "#/$defs/SeasonTemp",
+            "default": {
+              "mean_c": 21.5,
+              "sd_c": 4.0,
+              "min_c": 10.0,
+              "max_c": 37.0
+            },
+            "description": "Summer (Jun 21\u2013Sep 20)."
+          },
+          "fall": {
+            "$ref": "#/$defs/SeasonTemp",
+            "default": {
+              "mean_c": 9.5,
+              "sd_c": 6.5,
+              "min_c": -10.0,
+              "max_c": 28.0
+            },
+            "description": "Fall (Sep 21\u2013Dec 20)."
+          },
+          "persistence": {
+            "default": 0.7,
+            "description": "Day-to-day AR(1) persistence of temperature anomalies.",
+            "maximum": 0.98,
+            "minimum": 0,
+            "title": "Persistence",
+            "type": "number",
+            "x-advanced": true
+          },
+          "storm_days_per_year": {
+            "default": 28.0,
+            "description": "Thunderstorm days per year (mostly May\u2013Sep).",
+            "maximum": 120,
+            "minimum": 0,
+            "title": "Storm Days Per Year",
+            "type": "number",
+            "x-effects": [
+              "lightning outages",
+              "estimated reads"
+            ]
+          },
+          "heating_base_c": {
+            "default": 15.0,
+            "description": "Heating starts below this temperature.",
+            "maximum": 22,
+            "minimum": 5,
+            "title": "Heating Base C",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "C"
+          },
+          "cooling_base_c": {
+            "default": 22.0,
+            "description": "Cooling starts above this temperature.",
+            "maximum": 30,
+            "minimum": 15,
+            "title": "Cooling Base C",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "C"
+          }
+        },
+        "title": "Weather",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 7
+      }
+    },
+    {
+      "group": "incidents",
+      "legacyScope": "generation",
+      "fields": [
+        "gas_service_leaks_per_1000",
+        "gas_main_leaks_per_100km",
+        "water_main_breaks_per_100km",
+        "overhead_faults_per_km_storm_day",
+        "transformer_failures_per_1000",
+        "collector_outages_per_year",
+        "manual_only"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "What goes wrong, how often. Rates are per year. Each operations day draws its background incidents at these rates; they are the defaults of the operations run's random-incident settings (x-run-setting), so a run can change them without a new town.",
+        "properties": {
+          "gas_service_leaks_per_1000": {
+            "default": 1.2,
+            "description": "Leaks per 1,000 gas services per year.",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Gas Service Leaks Per 1000",
+            "type": "number"
+          },
+          "gas_main_leaks_per_100km": {
+            "default": 8.0,
+            "description": "Leaks per 100 km of gas main per year.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Gas Main Leaks Per 100Km",
+            "type": "number"
+          },
+          "water_main_breaks_per_100km": {
+            "default": 14.0,
+            "description": "Main breaks per 100 km per year (\u00d72 for cast iron).",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Water Main Breaks Per 100Km",
+            "type": "number",
+            "x-effects": [
+              "water outages",
+              "crew workload"
+            ]
+          },
+          "overhead_faults_per_km_storm_day": {
+            "default": 0.015,
+            "description": "Overhead primary faults per km per storm day.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Overhead Faults Per Km Storm Day",
+            "type": "number",
+            "x-effects": [
+              "outages",
+              "SAIDI/SAIFI",
+              "zero-usage reads"
+            ]
+          },
+          "transformer_failures_per_1000": {
+            "default": 3.0,
+            "description": "Transformer failures per 1,000 units per year (\u00d73 when overloaded).",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Transformer Failures Per 1000",
+            "type": "number"
+          },
+          "collector_outages_per_year": {
+            "default": 2.0,
+            "description": "AMI collector outages per year (town-wide).",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Collector Outages Per Year",
+            "type": "number"
+          },
+          "manual_only": {
+            "default": false,
+            "description": "Disable random hazards; only manually injected incidents occur (the run's \"Random incidents\" switch defaults to the opposite).",
+            "title": "Manual Only",
+            "type": "boolean",
+            "x-effects": [
+              "background incidents"
+            ]
+          }
+        },
+        "title": "Incidents & hazards",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 8
+      }
+    },
+    {
+      "group": "operations",
+      "legacyScope": "generation",
+      "fields": [
+        "gas_crews",
+        "electric_crews",
+        "water_crews",
+        "meter_techs",
+        "meter_vans",
+        "meter_walkers",
+        "shift_start_hour",
+        "shift_end_hour",
+        "gas_response_target_min",
+        "speed_kmh_arterial",
+        "speed_kmh_collector",
+        "speed_kmh_local"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Fleet, shifts, response targets and vehicle movement. Crews, readers, the shift and the gas target are the defaults of the operations run settings (x-run-setting), so a run can change them without a new town.",
+        "properties": {
+          "gas_crews": {
+            "default": 2,
+            "description": "Gas emergency crews.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Gas Crews",
+            "type": "integer",
+            "x-effects": [
+              "leak response time"
+            ]
+          },
+          "electric_crews": {
+            "default": 3,
+            "description": "Electric trouble crews.",
+            "maximum": 30,
+            "minimum": 0,
+            "title": "Electric Crews",
+            "type": "integer",
+            "x-effects": [
+              "outage duration",
+              "SAIDI"
+            ]
+          },
+          "water_crews": {
+            "default": 2,
+            "description": "Water distribution crews.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Water Crews",
+            "type": "integer"
+          },
+          "meter_techs": {
+            "default": 2,
+            "description": "Meter technicians (exchanges, investigations).",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Meter Techs",
+            "type": "integer"
+          },
+          "meter_vans": {
+            "default": 2,
+            "description": "Drive-by AMR reading vans.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Meter Vans",
+            "type": "integer",
+            "x-effects": [
+              "AMR read completion"
+            ]
+          },
+          "meter_walkers": {
+            "default": 3,
+            "description": "Manual meter readers.",
+            "maximum": 40,
+            "minimum": 0,
+            "title": "Meter Walkers",
+            "type": "integer",
+            "x-effects": [
+              "manual read completion",
+              "no-access"
+            ]
+          },
+          "shift_start_hour": {
+            "default": 7.0,
+            "description": "Day shift start. Non-emergency work (AMI collector repairs) waits for the day shift; emergencies are worked around the clock.",
+            "maximum": 23,
+            "minimum": 0,
+            "title": "Shift Start Hour",
+            "type": "number",
+            "x-effects": [
+              "collector outage length"
+            ],
+            "x-unit": "h"
+          },
+          "shift_end_hour": {
+            "default": 15.5,
+            "description": "Day shift end.",
+            "maximum": 24,
+            "minimum": 1,
+            "title": "Shift End Hour",
+            "type": "number",
+            "x-effects": [
+              "collector outage length"
+            ],
+            "x-unit": "h"
+          },
+          "gas_response_target_min": {
+            "default": 60.0,
+            "description": "Target response to a gas odour call.",
+            "maximum": 240,
+            "minimum": 10,
+            "title": "Gas Response Target Min",
+            "type": "number",
+            "x-unit": "min"
+          },
+          "speed_kmh_arterial": {
+            "default": 50.0,
+            "description": "Driving speed on arterials.",
+            "maximum": 100,
+            "minimum": 10,
+            "title": "Speed Kmh Arterial",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "km/h"
+          },
+          "speed_kmh_collector": {
+            "default": 40.0,
+            "description": "Driving speed on collectors.",
+            "maximum": 80,
+            "minimum": 10,
+            "title": "Speed Kmh Collector",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "km/h"
+          },
+          "speed_kmh_local": {
+            "default": 30.0,
+            "description": "Driving speed on local streets.",
+            "maximum": 60,
+            "minimum": 5,
+            "title": "Speed Kmh Local",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "km/h"
+          }
+        },
+        "title": "Field operations",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 9
+      }
+    },
+    {
+      "group": "customers_billing",
+      "legacyScope": "generation",
+      "fields": [
+        "services",
+        "mru_target_meters",
+        "bill_cycles",
+        "currency",
+        "tax_rate",
+        "electric_fixed_monthly",
+        "electric_blocks",
+        "electric_variable_delivery",
+        "net_metering_credit",
+        "gas_fixed_monthly",
+        "gas_price_m3",
+        "water_fixed_monthly",
+        "water_price_m3",
+        "wastewater_ratio",
+        "on_time_payer_share",
+        "late_payer_share",
+        "pre_authorized_share",
+        "due_days"
+      ],
+      "schema": {
+        "$defs": {
+          "RateBlock": {
+            "additionalProperties": false,
+            "properties": {
+              "up_to": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Up To"
+              },
+              "price": {
+                "title": "Price",
+                "type": "number"
+              }
+            },
+            "required": [
+              "up_to",
+              "price"
+            ],
+            "title": "RateBlock",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Accounts, reading routes, calendars and tariffs.",
+        "properties": {
+          "services": {
+            "default": [
+              "electric",
+              "water",
+              "gas"
+            ],
+            "description": "The services your utility provides in this town. The networks are there either way; for a service you do not provide, another utility runs it: no accounts, meters, reads, bills, crews, maintenance or calls of yours, and its settings do not apply.",
+            "items": {
+              "enum": [
+                "electric",
+                "water",
+                "gas"
+              ],
+              "type": "string"
+            },
+            "title": "Services",
+            "type": "array",
+            "x-effects": [
+              "accounts and meters",
+              "bills",
+              "field work",
+              "outage and odour calls"
+            ]
+          },
+          "mru_target_meters": {
+            "default": 450,
+            "description": "Target premises per meter reading unit (route).",
+            "maximum": 3000,
+            "minimum": 50,
+            "title": "Mru Target Meters",
+            "type": "integer",
+            "x-effects": [
+              "route count",
+              "read workload per day"
+            ]
+          },
+          "bill_cycles": {
+            "default": 21,
+            "description": "Billing portions per month (one per working day).",
+            "maximum": 31,
+            "minimum": 1,
+            "title": "Bill Cycles",
+            "type": "integer"
+          },
+          "currency": {
+            "default": "CAD",
+            "description": "Billing currency.",
+            "title": "Currency",
+            "type": "string"
+          },
+          "tax_rate": {
+            "default": 0.13,
+            "description": "Sales tax on utility bills (Ontario HST).",
+            "maximum": 0.3,
+            "minimum": 0,
+            "title": "Tax Rate",
+            "type": "number"
+          },
+          "electric_fixed_monthly": {
+            "default": 36.5,
+            "description": "Electric fixed delivery charge per month.",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Electric Fixed Monthly",
+            "type": "number",
+            "x-unit": "$"
+          },
+          "electric_blocks": {
+            "default": [
+              {
+                "up_to": 600.0,
+                "price": 0.098
+              },
+              {
+                "up_to": null,
+                "price": 0.116
+              }
+            ],
+            "description": "Electric energy price blocks per kWh (summer threshold).",
+            "items": {
+              "$ref": "#/$defs/RateBlock"
+            },
+            "title": "Electric Blocks",
+            "type": "array",
+            "x-unit": "$/kWh"
+          },
+          "electric_variable_delivery": {
+            "default": 0.042,
+            "description": "Electric variable delivery per kWh.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Electric Variable Delivery",
+            "type": "number",
+            "x-unit": "$/kWh"
+          },
+          "net_metering_credit": {
+            "default": 0.098,
+            "description": "Credit per exported kWh.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Net Metering Credit",
+            "type": "number",
+            "x-effects": [
+              "solar customer bills"
+            ],
+            "x-unit": "$/kWh"
+          },
+          "gas_fixed_monthly": {
+            "default": 26.5,
+            "description": "Gas customer charge per month.",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Gas Fixed Monthly",
+            "type": "number",
+            "x-unit": "$"
+          },
+          "gas_price_m3": {
+            "default": 0.36,
+            "description": "Gas delivery + supply per m\u00b3.",
+            "maximum": 5,
+            "minimum": 0,
+            "title": "Gas Price M3",
+            "type": "number",
+            "x-unit": "$/m3"
+          },
+          "water_fixed_monthly": {
+            "default": 18.0,
+            "description": "Water fixed charge per month.",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Water Fixed Monthly",
+            "type": "number",
+            "x-unit": "$"
+          },
+          "water_price_m3": {
+            "default": 2.15,
+            "description": "Water volumetric charge.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Water Price M3",
+            "type": "number",
+            "x-unit": "$/m3"
+          },
+          "wastewater_ratio": {
+            "default": 1.05,
+            "description": "Wastewater charge as a multiple of the water volumetric charge.",
+            "maximum": 3,
+            "minimum": 0,
+            "title": "Wastewater Ratio",
+            "type": "number"
+          },
+          "on_time_payer_share": {
+            "default": 0.82,
+            "description": "Share of accounts that pay on time.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "On Time Payer Share",
+            "type": "number",
+            "x-effects": [
+              "dunning",
+              "collections",
+              "carrying cost"
+            ]
+          },
+          "late_payer_share": {
+            "default": 0.14,
+            "description": "Share that pay late.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Late Payer Share",
+            "type": "number"
+          },
+          "pre_authorized_share": {
+            "default": 0.45,
+            "description": "Share on pre-authorized debit.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Pre Authorized Share",
+            "type": "number",
+            "x-advanced": true
+          },
+          "due_days": {
+            "default": 20,
+            "description": "Days from invoice to due date.",
+            "maximum": 60,
+            "minimum": 5,
+            "title": "Due Days",
+            "type": "integer"
+          }
+        },
+        "title": "Customers & billing",
+        "type": "object",
+        "x-applies": "town",
+        "x-group": true,
+        "x-order": 10
+      }
+    },
+    {
+      "group": "process",
+      "legacyScope": "run",
+      "fields": [
+        "rpa_coverage",
+        "analyst_queue_days_min",
+        "analyst_queue_days_max",
+        "carry_rate_per_day",
+        "receivable_carry_ratio",
+        "analysts",
+        "analyst_hours_per_day",
+        "review_minutes_min",
+        "review_minutes_max",
+        "supervisors",
+        "supervisor_hours_per_day",
+        "supervisor_minutes",
+        "supervisor_queue_days_min",
+        "supervisor_queue_days_max",
+        "field_orders_per_day",
+        "field_days_min",
+        "analyst_accuracy"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Work queues, automation, workforce, costs and carrying cost.",
+        "properties": {
+          "rpa_coverage": {
+            "default": 0.35,
+            "description": "Share of exception types with an RPA/auto-resolve rule.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Rpa Coverage",
+            "type": "number",
+            "x-effects": [
+              "analyst workload",
+              "days to invoice",
+              "carrying cost"
+            ]
+          },
+          "analyst_queue_days_min": {
+            "default": 1,
+            "description": "Minimum queue wait before an analyst picks up an exception.",
+            "maximum": 10,
+            "minimum": 1,
+            "title": "Analyst Queue Days Min",
+            "type": "integer"
+          },
+          "analyst_queue_days_max": {
+            "default": 3,
+            "description": "Maximum queue wait.",
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Analyst Queue Days Max",
+            "type": "integer"
+          },
+          "carry_rate_per_day": {
+            "default": 1.25,
+            "description": "Carrying cost per account per day before invoicing.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Carry Rate Per Day",
+            "type": "number",
+            "x-unit": "$"
+          },
+          "receivable_carry_ratio": {
+            "default": 0.4,
+            "description": "Receivable carry as a share of the billing carry rate.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Receivable Carry Ratio",
+            "type": "number",
+            "x-advanced": true
+          },
+          "analysts": {
+            "default": 2,
+            "description": "Billing analysts working the exception queues.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Analysts",
+            "type": "integer",
+            "x-effects": [
+              "queue backlog",
+              "days to bill",
+              "carrying cost"
+            ]
+          },
+          "analyst_hours_per_day": {
+            "default": 6.0,
+            "description": "Productive queue hours per analyst per business day.",
+            "maximum": 10,
+            "minimum": 0.5,
+            "title": "Analyst Hours Per Day",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "review_minutes_min": {
+            "default": 15.0,
+            "description": "Shortest analyst review.",
+            "maximum": 240,
+            "minimum": 1,
+            "title": "Review Minutes Min",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "min"
+          },
+          "review_minutes_max": {
+            "default": 30.0,
+            "description": "Longest analyst review.",
+            "maximum": 480,
+            "minimum": 1,
+            "title": "Review Minutes Max",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "min"
+          },
+          "supervisors": {
+            "default": 1,
+            "description": "Supervisors approving escalations.",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Supervisors",
+            "type": "integer",
+            "x-effects": [
+              "escalation backlog"
+            ]
+          },
+          "supervisor_hours_per_day": {
+            "default": 2.0,
+            "description": "Supervisor hours on escalations per business day.",
+            "maximum": 10,
+            "minimum": 0.25,
+            "title": "Supervisor Hours Per Day",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "h"
+          },
+          "supervisor_minutes": {
+            "default": 40.0,
+            "description": "Supervisor review time per escalation.",
+            "maximum": 240,
+            "minimum": 5,
+            "title": "Supervisor Minutes",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "min"
+          },
+          "supervisor_queue_days_min": {
+            "default": 1,
+            "description": "Minimum wait before a supervisor picks up an escalation (VEE's own escalations wait this long).",
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Supervisor Queue Days Min",
+            "type": "integer",
+            "x-effects": [
+              "escalation backlog",
+              "days to bill"
+            ],
+            "x-unit": "d"
+          },
+          "supervisor_queue_days_max": {
+            "default": 3,
+            "description": "Maximum wait before a supervisor picks up an escalation from an analyst or you. An escalation you take yourself (assign) waits for you.",
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Supervisor Queue Days Max",
+            "type": "integer",
+            "x-effects": [
+              "escalation backlog",
+              "days to bill"
+            ],
+            "x-unit": "d"
+          },
+          "field_orders_per_day": {
+            "default": 6,
+            "description": "Meter investigations, re-reads and exchanges completed per business day.",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Field Orders Per Day",
+            "type": "integer",
+            "x-effects": [
+              "field order backlog",
+              "estimates"
+            ]
+          },
+          "field_days_min": {
+            "default": 1,
+            "description": "Earliest a field order is worked after it is raised.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Field Days Min",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "d"
+          },
+          "analyst_accuracy": {
+            "default": 0.95,
+            "description": "Share of reviews where the analyst finds the true cause.",
+            "maximum": 1,
+            "minimum": 0.5,
+            "title": "Analyst Accuracy",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "billing errors",
+              "wasted truck rolls"
+            ]
+          }
+        },
+        "title": "Meter-to-cash process",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 11
+      }
+    },
+    {
+      "group": "anomalies",
+      "legacyScope": "run",
+      "fields": [
+        "enabled",
+        "leak",
+        "stuck_meter",
+        "slow_meter",
+        "transposed_digits",
+        "misread",
+        "consecutive_estimates",
+        "missing_read",
+        "exchange_registration_failure",
+        "vacant_consuming",
+        "tamper",
+        "amr_factor",
+        "manual_factor"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Injected faults with ground truth. Rates per 1,000 meters per year.",
+        "properties": {
+          "enabled": {
+            "default": true,
+            "description": "Inject anomalies into observed reads (truth is always kept separately).",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "leak": {
+            "default": 8.0,
+            "description": "Continuous post-meter water leaks.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Leak",
+            "type": "number"
+          },
+          "stuck_meter": {
+            "default": 5.0,
+            "description": "Registers that stop advancing.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Stuck Meter",
+            "type": "number"
+          },
+          "slow_meter": {
+            "default": 4.0,
+            "description": "Meters under-registering 10\u201340%.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Slow Meter",
+            "type": "number"
+          },
+          "transposed_digits": {
+            "default": 6.0,
+            "description": "Reads with two digits swapped.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Transposed Digits",
+            "type": "number"
+          },
+          "misread": {
+            "default": 6.0,
+            "description": "Reads off by one in a high digit.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Misread",
+            "type": "number"
+          },
+          "consecutive_estimates": {
+            "default": 15.0,
+            "description": "Runs of 2\u20134 estimated periods (higher on manual routes).",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Consecutive Estimates",
+            "type": "number"
+          },
+          "missing_read": {
+            "default": 5.0,
+            "description": "Periods with no read document.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Missing Read",
+            "type": "number"
+          },
+          "exchange_registration_failure": {
+            "default": 2.0,
+            "description": "Meter exchanges whose new serial fails registration.",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Exchange Registration Failure",
+            "type": "number"
+          },
+          "vacant_consuming": {
+            "default": 3.0,
+            "description": "Vacant premises that still consume.",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Vacant Consuming",
+            "type": "number"
+          },
+          "tamper": {
+            "default": 1.0,
+            "description": "Bypass/tamper (50\u201390% under-registration).",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Tamper",
+            "type": "number"
+          },
+          "amr_factor": {
+            "default": 1.0,
+            "description": "Multiplier on every anomaly rate for AMR (drive-by) meters: an ageing ERT fleet misreads and under-registers more.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Amr Factor",
+            "type": "number",
+            "x-advanced": true
+          },
+          "manual_factor": {
+            "default": 1.0,
+            "description": "Multiplier on every anomaly rate for manually read meters.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Manual Factor",
+            "type": "number",
+            "x-advanced": true
+          }
+        },
+        "title": "Meter & read anomalies",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 12
+      }
+    },
+    {
+      "group": "scenario",
+      "legacyScope": "run",
+      "fields": [
+        "name",
+        "date",
+        "hour",
+        "target_premise",
+        "leak_m3h"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Demonstration scenario on the live clock.",
+        "properties": {
+          "name": {
+            "default": "normal",
+            "description": "Live demonstration scenario.",
+            "enum": [
+              "normal",
+              "solar_noon",
+              "leak",
+              "substation_outage"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "date": {
+            "default": "2026-07-15",
+            "description": "Demonstration date (local).",
+            "title": "Date",
+            "type": "string"
+          },
+          "hour": {
+            "default": 8.0,
+            "description": "Demonstration hour (local, decimal).",
+            "exclusiveMaximum": 24,
+            "minimum": 0,
+            "title": "Hour",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "target_premise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Premise targeted by the leak scenario (default: first premise).",
+            "title": "Target Premise"
+          },
+          "leak_m3h": {
+            "default": 0.65,
+            "description": "Leak rate added to the target premise's water demand.",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Leak M3H",
+            "type": "number",
+            "x-unit": "m3/h"
+          }
+        },
+        "title": "Scenario",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 13
+      }
+    },
+    {
+      "group": "reading",
+      "legacyScope": "run",
+      "fields": [
+        "ami_missed_read",
+        "amr_missed_read",
+        "manual_no_access",
+        "no_access_repeat",
+        "read_cost_ami",
+        "read_cost_amr",
+        "read_cost_manual"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "How periodic billing reads succeed or fail, by meter technology.",
+        "properties": {
+          "ami_missed_read": {
+            "default": 0.012,
+            "description": "AMI billing reads still missing after the head-end retry window (1: a day the head end is down).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Ami Missed Read",
+            "type": "number",
+            "x-effects": [
+              "comm-fail exceptions",
+              "estimates"
+            ]
+          },
+          "amr_missed_read": {
+            "default": 0.03,
+            "description": "Drive-by reads missed (no signal, street skipped; 1: the van does not go out).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Amr Missed Read",
+            "type": "number"
+          },
+          "manual_no_access": {
+            "default": 0.06,
+            "description": "Manual reads with no access (locked gate, dog, meter inside; 1: nobody walks the route).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Manual No Access",
+            "type": "number",
+            "x-effects": [
+              "no-access exceptions",
+              "consecutive estimates"
+            ]
+          },
+          "no_access_repeat": {
+            "default": 0.4,
+            "description": "Chance a missed manual read is missed again the next month.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "No Access Repeat",
+            "type": "number",
+            "x-advanced": true
+          },
+          "read_cost_ami": {
+            "default": 0.1,
+            "description": "Cost of one AMI read.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Read Cost Ami",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "read_cost_amr": {
+            "default": 0.35,
+            "description": "Cost of one drive-by read.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Read Cost Amr",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "read_cost_manual": {
+            "default": 1.2,
+            "description": "Cost of one walked read.",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Read Cost Manual",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          }
+        },
+        "title": "Meter reading",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 14
+      }
+    },
+    {
+      "group": "vee",
+      "legacyScope": "run",
+      "fields": [
+        "high_ratio",
+        "low_ratio",
+        "zero_at_occupied",
+        "max_consecutive_estimates",
+        "min_period_days",
+        "max_period_days",
+        "accept_confidence",
+        "reject_confidence",
+        "escalate_impact",
+        "trend_ratio",
+        "trend_periods",
+        "oms_events",
+        "estimation",
+        "history_noise"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Validation, estimation and editing: the five-test battery, confidence and disposition (VEE v5 shape).",
+        "properties": {
+          "high_ratio": {
+            "default": 2.0,
+            "description": "Flag consumption above this multiple of expected (tolerance high).",
+            "maximum": 10,
+            "minimum": 1.1,
+            "title": "High Ratio",
+            "type": "number",
+            "x-effects": [
+              "flagged reads",
+              "analyst workload"
+            ]
+          },
+          "low_ratio": {
+            "default": 0.35,
+            "description": "Flag consumption below this share of expected (tolerance low).",
+            "maximum": 0.95,
+            "minimum": 0,
+            "title": "Low Ratio",
+            "type": "number"
+          },
+          "zero_at_occupied": {
+            "default": true,
+            "description": "Flag zero consumption at an occupied premise.",
+            "title": "Zero At Occupied",
+            "type": "boolean"
+          },
+          "max_consecutive_estimates": {
+            "default": 2,
+            "description": "Estimates in a row before a field read is ordered.",
+            "maximum": 12,
+            "minimum": 1,
+            "title": "Max Consecutive Estimates",
+            "type": "integer",
+            "x-effects": [
+              "field orders"
+            ]
+          },
+          "min_period_days": {
+            "default": 25,
+            "description": "Shortest plausible read period.",
+            "maximum": 40,
+            "minimum": 1,
+            "title": "Min Period Days",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "d"
+          },
+          "max_period_days": {
+            "default": 38,
+            "description": "Longest plausible read period.",
+            "maximum": 120,
+            "minimum": 20,
+            "title": "Max Period Days",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "d"
+          },
+          "accept_confidence": {
+            "default": 0.75,
+            "description": "Auto-accept at or above this confidence.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Accept Confidence",
+            "type": "number",
+            "x-effects": [
+              "auto-accept rate",
+              "billing errors"
+            ]
+          },
+          "reject_confidence": {
+            "default": 0.35,
+            "description": "Reject below this confidence.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Reject Confidence",
+            "type": "number"
+          },
+          "escalate_impact": {
+            "default": 150.0,
+            "description": "Escalate a doubtful read when its bill impact exceeds this.",
+            "maximum": 10000,
+            "minimum": 0,
+            "title": "Escalate Impact",
+            "type": "number",
+            "x-effects": [
+              "supervisor workload"
+            ],
+            "x-unit": "$"
+          },
+          "trend_ratio": {
+            "default": 0.8,
+            "description": "Persistent low use: flag reads below this share of expected \u2026",
+            "maximum": 1.0,
+            "minimum": 0.3,
+            "title": "Trend Ratio",
+            "type": "number",
+            "x-effects": [
+              "slow and tampered meters found"
+            ]
+          },
+          "trend_periods": {
+            "default": 3,
+            "description": "\u2026 for this many periods in a row.",
+            "maximum": 12,
+            "minimum": 2,
+            "title": "Trend Periods",
+            "type": "integer"
+          },
+          "oms_events": {
+            "default": true,
+            "description": "Use outage events (OMS, AMI last gasps) from operations: hours without service lower the expected use.",
+            "title": "Oms Events",
+            "type": "boolean",
+            "x-effects": [
+              "low-usage flags after outages"
+            ]
+          },
+          "estimation": {
+            "default": "prior_year",
+            "description": "Estimation method for missing or rejected reads.",
+            "enum": [
+              "prior_year",
+              "recent_average"
+            ],
+            "title": "Estimation",
+            "type": "string"
+          },
+          "history_noise": {
+            "default": 0.1,
+            "description": "Spread of prior-year history around this year's normal usage.",
+            "maximum": 0.5,
+            "minimum": 0,
+            "title": "History Noise",
+            "type": "number",
+            "x-advanced": true
+          }
+        },
+        "title": "VEE rules",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 15
+      }
+    },
+    {
+      "group": "billing",
+      "legacyScope": "run",
+      "fields": [
+        "rate_change_date",
+        "rate_change_pct",
+        "high_bill_ratio",
+        "high_bill_min",
+        "first_bill_limit",
+        "credit_review",
+        "outsort_auto_release_max",
+        "billing_queue_worked_by",
+        "trueup_max_ratio",
+        "data_error_rate",
+        "print_lag_days",
+        "pad_reject_rate",
+        "nsf_fee",
+        "late_fee_pct",
+        "reminder_days",
+        "notice_days",
+        "disconnect_days",
+        "winter_moratorium",
+        "moratorium_start",
+        "moratorium_end",
+        "disconnect_notice_days",
+        "disconnect_rule_share",
+        "disconnect_payment_rate",
+        "arrangement_break_rate",
+        "low_income_referral_rate",
+        "low_income_review_days",
+        "low_income_approval_rate",
+        "low_income_grant_max",
+        "budget_billing_offer_rate"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "Bill checks, tariff versions, invoicing, payments and dunning.",
+        "properties": {
+          "rate_change_date": {
+            "default": "2026-11-01",
+            "description": "Date a new tariff version takes effect (volumetric prices).",
+            "title": "Rate Change Date",
+            "type": "string"
+          },
+          "rate_change_pct": {
+            "default": 3.5,
+            "description": "Volumetric price change in the new tariff version.",
+            "maximum": 100,
+            "minimum": -50,
+            "title": "Rate Change Pct",
+            "type": "number",
+            "x-effects": [
+              "bills after the change",
+              "proration"
+            ],
+            "x-unit": "%"
+          },
+          "high_bill_ratio": {
+            "default": 2.5,
+            "description": "Block a bill above this multiple of its expected amount (prior-year use at current prices).",
+            "maximum": 20,
+            "minimum": 1.1,
+            "title": "High Bill Ratio",
+            "type": "number",
+            "x-effects": [
+              "billing blocks",
+              "analyst workload"
+            ]
+          },
+          "high_bill_min": {
+            "default": 150.0,
+            "description": "\u2026and at least this much above the expected amount.",
+            "maximum": 5000,
+            "minimum": 0,
+            "title": "High Bill Min",
+            "type": "number",
+            "x-unit": "$"
+          },
+          "first_bill_limit": {
+            "default": 600.0,
+            "description": "Block a bill with no expected use (vacant, new) above this total.",
+            "maximum": 10000,
+            "minimum": 0,
+            "title": "First Bill Limit",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "credit_review": {
+            "default": 75.0,
+            "description": "Block a bill that is a credit larger than this.",
+            "maximum": 5000,
+            "minimum": 0,
+            "title": "Credit Review",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "outsort_auto_release_max": {
+            "default": 500.0,
+            "description": "RPA may release a high-bill or large-credit outsort only up to this bill amount (either sign); a larger one waits for an analyst.",
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Outsort Auto Release Max",
+            "type": "number",
+            "x-effects": [
+              "analyst workload",
+              "billing errors"
+            ],
+            "x-unit": "$"
+          },
+          "billing_queue_worked_by": {
+            "default": "analysts",
+            "description": "Who works the BILLING queue (high bills, large credits, true-ups, rate-class errors): the simulated analysts and RPA, or only you. With 'you', no analyst or RPA touches a billing block, so every outsort waits in the Studio for your release, rebill or escalation.",
+            "enum": [
+              "analysts",
+              "you"
+            ],
+            "title": "Billing Queue Worked By",
+            "type": "string",
+            "x-effects": [
+              "billing blocks",
+              "days to invoice",
+              "billing carry"
+            ]
+          },
+          "trueup_max_ratio": {
+            "default": 3.0,
+            "description": "Block a bill whose estimate true-up (a negative period quantity) is larger than this multiple of the period's expected use; an analyst decides it.",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Trueup Max Ratio",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "billing blocks",
+              "billing errors"
+            ],
+            "x-unit": "\u00d7"
+          },
+          "data_error_rate": {
+            "default": 3.0,
+            "description": "Installations with a wrong rate class in billing master data (per 1,000 per year).",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Data Error Rate",
+            "type": "number",
+            "x-effects": [
+              "rate-class billing blocks"
+            ]
+          },
+          "print_lag_days": {
+            "default": 1,
+            "description": "Days from invoice creation to issue.",
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Print Lag Days",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "d"
+          },
+          "pad_reject_rate": {
+            "default": 0.015,
+            "description": "Pre-authorized debits returned for insufficient funds.",
+            "maximum": 0.5,
+            "minimum": 0,
+            "title": "Pad Reject Rate",
+            "type": "number",
+            "x-effects": [
+              "payment rejections",
+              "collections"
+            ]
+          },
+          "nsf_fee": {
+            "default": 20.0,
+            "description": "Fee for a returned payment.",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Nsf Fee",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "late_fee_pct": {
+            "default": 1.5,
+            "description": "Late payment charge on overdue amounts (per notice).",
+            "maximum": 5,
+            "minimum": 0,
+            "title": "Late Fee Pct",
+            "type": "number",
+            "x-unit": "%"
+          },
+          "reminder_days": {
+            "default": 7,
+            "description": "Days after the due date for a reminder.",
+            "maximum": 60,
+            "minimum": 1,
+            "title": "Reminder Days",
+            "type": "integer",
+            "x-unit": "d"
+          },
+          "notice_days": {
+            "default": 21,
+            "description": "Days after the due date for an overdue notice and late fee.",
+            "maximum": 90,
+            "minimum": 1,
+            "title": "Notice Days",
+            "type": "integer",
+            "x-unit": "d"
+          },
+          "disconnect_days": {
+            "default": 45,
+            "description": "Days after the due date for a disconnection notice.",
+            "maximum": 180,
+            "minimum": 5,
+            "title": "Disconnect Days",
+            "type": "integer",
+            "x-effects": [
+              "disconnection notices"
+            ],
+            "x-unit": "d"
+          },
+          "winter_moratorium": {
+            "default": true,
+            "description": "No disconnection notices for electricity and water from Nov 15 to Apr 30 (Ontario); a notice held for the winter is issued on May 1 if the bill is still unpaid.",
+            "title": "Winter Moratorium",
+            "type": "boolean"
+          },
+          "moratorium_start": {
+            "default": "11-15",
+            "description": "First day of the winter moratorium (MM-DD).",
+            "title": "Moratorium Start",
+            "type": "string",
+            "x-advanced": true
+          },
+          "moratorium_end": {
+            "default": "04-30",
+            "description": "Last day of the winter moratorium (MM-DD); held notices go out the day after.",
+            "title": "Moratorium End",
+            "type": "string",
+            "x-advanced": true
+          },
+          "disconnect_notice_days": {
+            "default": 10,
+            "description": "Days from a disconnection notice to the earliest disconnection. A disconnection also needs a person's approval (the Collections worklist).",
+            "maximum": 60,
+            "minimum": 1,
+            "title": "Disconnect Notice Days",
+            "type": "integer",
+            "x-effects": [
+              "disconnections"
+            ],
+            "x-unit": "d"
+          },
+          "disconnect_rule_share": {
+            "default": 0.0,
+            "description": "Share of disconnection notices a collections rule approves when they are issued (the disconnection follows at the earliest day); the rest wait for a person's approval. 0: every disconnection needs you.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Disconnect Rule Share",
+            "type": "number",
+            "x-effects": [
+              "disconnections",
+              "field disconnects and reconnects"
+            ]
+          },
+          "disconnect_payment_rate": {
+            "default": 0.6,
+            "description": "Disconnected customers who pay within a week of the disconnection (and are reconnected the next business day); the rest stay off until they pay.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Disconnect Payment Rate",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "collections",
+              "reconnections"
+            ]
+          },
+          "arrangement_break_rate": {
+            "default": 0.3,
+            "description": "At-risk payers who break a payment arrangement after a few instalments (dunning resumes); other payers pay every instalment.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Arrangement Break Rate",
+            "type": "number",
+            "x-advanced": true,
+            "x-effects": [
+              "collections"
+            ]
+          },
+          "low_income_referral_rate": {
+            "default": 0.15,
+            "description": "Disconnection notices and winter moratorium holds after which the call centre refers the customer to a low-income programme (once a year per account).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Low Income Referral Rate",
+            "type": "number",
+            "x-effects": [
+              "Low Income Process cases",
+              "disconnections"
+            ]
+          },
+          "low_income_review_days": {
+            "default": 10,
+            "description": "Business days the low-income agency takes to decide a referral; dunning waits meanwhile.",
+            "maximum": 60,
+            "minimum": 1,
+            "title": "Low Income Review Days",
+            "type": "integer",
+            "x-advanced": true,
+            "x-unit": "d"
+          },
+          "low_income_approval_rate": {
+            "default": 0.7,
+            "description": "Referrals the agency approves with a grant.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Low Income Approval Rate",
+            "type": "number",
+            "x-effects": [
+              "collections",
+              "receivable"
+            ]
+          },
+          "low_income_grant_max": {
+            "default": 500.0,
+            "description": "Largest low-income grant credited to an account's arrears.",
+            "maximum": 5000,
+            "minimum": 0,
+            "title": "Low Income Grant Max",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "budget_billing_offer_rate": {
+            "default": 0.08,
+            "description": "Overdue notices after which the call centre enrols the customer in budget billing (once a year per account); the plan levels later invoices.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Budget Billing Offer Rate",
+            "type": "number",
+            "x-effects": [
+              "Budget Bill Cases",
+              "collections"
+            ]
+          }
+        },
+        "title": "Billing & collections",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 16
+      }
+    },
+    {
+      "group": "contact",
+      "legacyScope": "run",
+      "fields": [
+        "agents",
+        "open_hour",
+        "close_hour",
+        "patience_s",
+        "retry_share",
+        "repeat_share",
+        "callback",
+        "callback_after_s",
+        "callback_take_share",
+        "service_target_s",
+        "volume_factor",
+        "handle_factor",
+        "self_serve_factor",
+        "agent_cost_per_hour",
+        "self_serve_cost",
+        "abandon_cx_cost",
+        "emergency_answer_s",
+        "high_bill",
+        "bill_question",
+        "bill_wrong",
+        "back_bill",
+        "balance",
+        "payment_arrangement",
+        "payment_problem",
+        "password",
+        "move_in",
+        "move_out",
+        "new_connection",
+        "outage",
+        "gas_odour",
+        "meter_access",
+        "disconnection",
+        "complaint",
+        "dispute_cases",
+        "dispute_hold_days",
+        "complaint_cases",
+        "frustration_threshold",
+        "long_wait_s",
+        "autopay_cancel_share"
+      ],
+      "schema": {
+        "$defs": {
+          "ContactReason": {
+            "additionalProperties": false,
+            "description": "One reason customers contact the utility: how often it happens and what handling it takes.",
+            "properties": {
+              "per_event": {
+                "default": 0.0,
+                "description": "Share of triggering events that lead to a contact.",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Per Event",
+                "type": "number"
+              },
+              "per_1000": {
+                "default": 0.0,
+                "description": "Background contacts per 1,000 accounts per month.",
+                "maximum": 500,
+                "minimum": 0,
+                "title": "Per 1000",
+                "type": "number"
+              },
+              "self_serve": {
+                "default": 0.0,
+                "description": "Share handled by the IVR or online, with no agent.",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Self Serve",
+                "type": "number"
+              },
+              "handle_min": {
+                "default": 6.0,
+                "description": "Agent minutes per contact (talk and wrap-up).",
+                "maximum": 120,
+                "minimum": 0.5,
+                "title": "Handle Min",
+                "type": "number"
+              },
+              "resolved": {
+                "default": 0.9,
+                "description": "Share resolved on the first contact.",
+                "maximum": 1,
+                "minimum": 0,
+                "title": "Resolved",
+                "type": "number"
+              }
+            },
+            "title": "ContactReason",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Why customers phone, write or use the IVR, and the agents, hours and self-service that answer them. Contacts follow the year: bills, errors, rebills, dunning, payments, move-ins and move-outs, missed reads and the year's outages and gas leaks.",
+        "properties": {
+          "agents": {
+            "default": 1,
+            "description": "Agents on the phones on a business day (a small utility often has one, shared with billing).",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Agents",
+            "type": "integer",
+            "x-effects": [
+              "wait",
+              "abandonment"
+            ]
+          },
+          "open_hour": {
+            "default": 8.0,
+            "description": "Lines open (local time, business days).",
+            "maximum": 23,
+            "minimum": 0,
+            "title": "Open Hour",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "close_hour": {
+            "default": 17.0,
+            "description": "Lines close (local time).",
+            "maximum": 24,
+            "minimum": 1,
+            "title": "Close Hour",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "patience_s": {
+            "default": 240.0,
+            "description": "Average time a caller waits before hanging up.",
+            "maximum": 3600,
+            "minimum": 10,
+            "title": "Patience",
+            "type": "number",
+            "x-unit": "s"
+          },
+          "retry_share": {
+            "default": 0.6,
+            "description": "Callers who hung up or found the lines closed and try again.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Retry Share",
+            "type": "number"
+          },
+          "repeat_share": {
+            "default": 0.5,
+            "description": "Callers whose problem was not resolved who contact again within days.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Repeat Share",
+            "type": "number"
+          },
+          "callback": {
+            "default": true,
+            "description": "Offer a call back instead of holding when the wait is long.",
+            "title": "Callback",
+            "type": "boolean"
+          },
+          "callback_after_s": {
+            "default": 300.0,
+            "description": "Offer the call back when the expected wait exceeds this.",
+            "maximum": 3600,
+            "minimum": 0,
+            "title": "Call back after",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "s"
+          },
+          "callback_take_share": {
+            "default": 0.5,
+            "description": "Callers offered a call back who take it.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Callback Take Share",
+            "type": "number",
+            "x-advanced": true
+          },
+          "service_target_s": {
+            "default": 30.0,
+            "description": "Answer target for the service level (answered within it).",
+            "maximum": 600,
+            "minimum": 5,
+            "title": "Service target",
+            "type": "number",
+            "x-unit": "s"
+          },
+          "volume_factor": {
+            "default": 1.0,
+            "description": "Multiplies every reason's contact rates.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Volume Factor",
+            "type": "number"
+          },
+          "handle_factor": {
+            "default": 1.0,
+            "description": "Multiplies every reason's handling time.",
+            "maximum": 10,
+            "minimum": 0.1,
+            "title": "Handle Factor",
+            "type": "number"
+          },
+          "self_serve_factor": {
+            "default": 1.0,
+            "description": "Multiplies every reason's self-service share (0: IVR and web down).",
+            "maximum": 3,
+            "minimum": 0,
+            "title": "Self Serve Factor",
+            "type": "number"
+          },
+          "agent_cost_per_hour": {
+            "default": 38.0,
+            "description": "Loaded cost of an agent hour on the phones.",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Agent Cost Per Hour",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "self_serve_cost": {
+            "default": 0.4,
+            "description": "Cost of a contact the IVR or website handles.",
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Self Serve Cost",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "abandon_cx_cost": {
+            "default": 6.0,
+            "description": "Customer-experience cost of a caller who hangs up.",
+            "maximum": 200,
+            "minimum": 0,
+            "title": "Abandon Cx Cost",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "$"
+          },
+          "emergency_answer_s": {
+            "default": 15.0,
+            "description": "Answer time on the emergency line (gas odour, outages after hours).",
+            "maximum": 600,
+            "minimum": 1,
+            "title": "Emergency answer",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "s"
+          },
+          "high_bill": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.25,
+              "per_1000": 2.0,
+              "self_serve": 0.1,
+              "handle_min": 7.5,
+              "resolved": 0.85
+            },
+            "description": "High bill: an invoice at least 1.5 times what the account usually pays (and $40 more)."
+          },
+          "bill_question": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.008,
+              "per_1000": 1.5,
+              "self_serve": 0.2,
+              "handle_min": 6.0,
+              "resolved": 0.9
+            },
+            "description": "Questions about a bill: any invoice, more for estimated bills, first bills and bills after a rate change."
+          },
+          "bill_wrong": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.35,
+              "per_1000": 0.3,
+              "self_serve": 0.0,
+              "handle_min": 11.0,
+              "resolved": 0.6
+            },
+            "description": "Bill wrong: a bill that overcharges the customer (customers rarely call about undercharges)."
+          },
+          "back_bill": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.45,
+              "per_1000": 0.0,
+              "self_serve": 0.0,
+              "handle_min": 12.0,
+              "resolved": 0.7
+            },
+            "description": "Back bill: a rebill, or the first actual bill after estimates, that catches up on under-billed use."
+          },
+          "balance": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.03,
+              "per_1000": 4.0,
+              "self_serve": 0.75,
+              "handle_min": 3.0,
+              "resolved": 0.98
+            },
+            "description": "What's my balance: around due dates; mostly the IVR."
+          },
+          "payment_arrangement": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.12,
+              "per_1000": 0.5,
+              "self_serve": 0.1,
+              "handle_min": 9.0,
+              "resolved": 0.8
+            },
+            "description": "Can't pay: after overdue notices, more after disconnection notices."
+          },
+          "payment_problem": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.4,
+              "per_1000": 0.4,
+              "self_serve": 0.3,
+              "handle_min": 6.0,
+              "resolved": 0.85
+            },
+            "description": "Payment problem: a pre-authorized debit returned."
+          },
+          "password": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.01,
+              "per_1000": 3.0,
+              "self_serve": 0.6,
+              "handle_min": 4.0,
+              "resolved": 0.95
+            },
+            "description": "Forgot password or online account help: when bills arrive; most reset online."
+          },
+          "move_in": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.85,
+              "per_1000": 0.0,
+              "self_serve": 0.3,
+              "handle_min": 10.0,
+              "resolved": 0.95
+            },
+            "description": "Start service: a new account at a premise, days before the move-in."
+          },
+          "move_out": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.85,
+              "per_1000": 0.0,
+              "self_serve": 0.3,
+              "handle_min": 8.0,
+              "resolved": 0.95
+            },
+            "description": "Stop service: days before an account closes."
+          },
+          "new_connection": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.0,
+              "per_1000": 0.4,
+              "self_serve": 0.1,
+              "handle_min": 14.0,
+              "resolved": 0.7
+            },
+            "description": "New connection: builders and owners asking for a new service."
+          },
+          "outage": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.18,
+              "per_1000": 0.2,
+              "self_serve": 0.65,
+              "handle_min": 3.5,
+              "resolved": 0.9
+            },
+            "description": "Outage report: customers who lose power or water (twice as many when it lasts over two hours); the IVR's outage message answers most."
+          },
+          "gas_odour": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.06,
+              "per_1000": 0.15,
+              "self_serve": 0.0,
+              "handle_min": 4.0,
+              "resolved": 1.0
+            },
+            "description": "I smell gas: neighbours of a gas leak (the household with a service leak calls 9 times in 10); emergency line."
+          },
+          "meter_access": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.08,
+              "per_1000": 0.3,
+              "self_serve": 0.2,
+              "handle_min": 6.0,
+              "resolved": 0.85
+            },
+            "description": "Meter access: after a no-access read card, and to book field visits."
+          },
+          "disconnection": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.8,
+              "per_1000": 0.0,
+              "self_serve": 0.0,
+              "handle_min": 9.0,
+              "resolved": 0.85
+            },
+            "description": "Disconnected: customers asking to be reconnected after a disconnection you approved."
+          },
+          "complaint": {
+            "$ref": "#/$defs/ContactReason",
+            "default": {
+              "per_event": 0.5,
+              "per_1000": 0.2,
+              "self_serve": 0.0,
+              "handle_min": 14.0,
+              "resolved": 0.6
+            },
+            "description": "Complaint: after a second unresolved contact about the same thing, or after giving up on hold twice."
+          },
+          "dispute_cases": {
+            "default": 1.0,
+            "description": "Share of answered bill-wrong contacts (and unresolved high-bill and back-bill ones) that open a Bill Correction case: an analyst checks the read and rebills, or explains the bill. 0: disputes are only counted.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Dispute Cases",
+            "type": "number",
+            "x-effects": [
+              "bill disputes",
+              "rebills",
+              "dunning holds"
+            ]
+          },
+          "dispute_hold_days": {
+            "default": 30.0,
+            "description": "Collections pauses dunning on a disputed account until the dispute is decided, at most this long.",
+            "maximum": 120,
+            "minimum": 0,
+            "title": "Dispute Hold Days",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "d"
+          },
+          "complaint_cases": {
+            "default": true,
+            "description": "A complaint the lines take opens a Customer Complaints case for the analysts to answer (one open complaint per account).",
+            "title": "Complaint Cases",
+            "type": "boolean"
+          },
+          "frustration_threshold": {
+            "default": 3,
+            "description": "Bad experiences (a hang-up after a long wait, an unresolved contact, a wait past long_wait_s, a complaint) before a customer pays later from then on. 0: never.",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Frustration Threshold",
+            "type": "integer",
+            "x-effects": [
+              "late payment",
+              "autopay cancellations"
+            ]
+          },
+          "long_wait_s": {
+            "default": 600.0,
+            "description": "A wait this long counts as a bad experience even when the call is answered.",
+            "maximum": 7200,
+            "minimum": 30,
+            "title": "Long Wait S",
+            "type": "number",
+            "x-advanced": true,
+            "x-unit": "s"
+          },
+          "autopay_cancel_share": {
+            "default": 0.3,
+            "description": "Share of frustrated customers on pre-authorized debit who cancel it and pay by hand from then on (later, and sometimes not at all).",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Autopay Cancel Share",
+            "type": "number"
+          }
+        },
+        "title": "Contact centre",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 17
+      }
+    },
+    {
+      "group": "outages",
+      "legacyScope": "run",
+      "fields": [
+        "enabled",
+        "storm_factor",
+        "incident_factor",
+        "restore_factor"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "The operations day's background incidents drawn for every day of the year (same storms and leaks the map shows on a date): who loses power or water, for how long, and where gas is smelled. The contact centre hears about them.",
+        "properties": {
+          "enabled": {
+            "default": true,
+            "description": "Draw outages and leaks across the year.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "storm_factor": {
+            "default": 1.0,
+            "description": "Multiplies the chance that a day is a storm day.",
+            "maximum": 30,
+            "minimum": 0,
+            "title": "Storm Factor",
+            "type": "number"
+          },
+          "incident_factor": {
+            "default": 1.0,
+            "description": "Multiplies every incident rate (leaks, breaks, failures, faults).",
+            "maximum": 30,
+            "minimum": 0,
+            "title": "Incident Factor",
+            "type": "number"
+          },
+          "restore_factor": {
+            "default": 1.0,
+            "description": "Multiplies the time to restore service.",
+            "maximum": 20,
+            "minimum": 0.1,
+            "title": "Restore Factor",
+            "type": "number"
+          }
+        },
+        "title": "Outages & leaks over the year",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 18
+      }
+    },
+    {
+      "group": "field",
+      "legacyScope": "run",
+      "fields": [
+        "shift_start_hour",
+        "shift_hours",
+        "routing",
+        "stop_minutes",
+        "travel_minutes",
+        "callout_minutes",
+        "overtime_max_hours",
+        "remote_switch_share",
+        "seal_years_electric",
+        "seal_years_gas",
+        "seal_sample_size",
+        "seal_lot_pass_rate",
+        "battery_years",
+        "water_meter_life_years",
+        "dead_battery_miss",
+        "failed_lot_drift",
+        "old_water_meter_drift",
+        "deferred_pole_failures",
+        "deferred_tree_faults",
+        "deferred_leak_escalation",
+        "renewed_main_break_factor",
+        "construction_start_month",
+        "construction_end_month",
+        "crew_emergency",
+        "crew_meter",
+        "crew_electric",
+        "crew_water",
+        "crew_gas",
+        "crew_construction",
+        "gas_odour",
+        "no_supply",
+        "outage_repair",
+        "disconnect",
+        "reconnect",
+        "move_out",
+        "move_in",
+        "meter_investigation",
+        "corrective_exchange",
+        "seal_exchange",
+        "ami_battery",
+        "water_meter_replacement",
+        "removal",
+        "ami_conversion",
+        "pole_inspection",
+        "pole_replacement",
+        "tree_trimming",
+        "valve_exercise",
+        "valve_repair",
+        "hydrant_flush",
+        "hydrant_repair",
+        "leak_survey",
+        "gas_leak_repair",
+        "regulator_inspection",
+        "new_set",
+        "meter_set",
+        "service_upgrade",
+        "main_replacement"
+      ],
+      "schema": {
+        "$defs": {
+          "FieldCrew": {
+            "additionalProperties": false,
+            "description": "One kind of field crew: how many there are for the town's size, and what an hour costs.",
+            "properties": {
+              "per_1000_premises": {
+                "default": 0.5,
+                "description": "Crews per 1,000 premises. A fraction is part of a crew's time (the rest goes to work this model does not draw); on-call responders are at least one when above zero.",
+                "maximum": 20,
+                "minimum": 0,
+                "title": "Per 1000 Premises",
+                "type": "number"
+              },
+              "cost_per_hour": {
+                "default": 120.0,
+                "description": "Loaded cost of a crew hour, truck included.",
+                "maximum": 1000,
+                "minimum": 0,
+                "title": "Cost Per Hour",
+                "type": "number"
+              },
+              "overtime_factor": {
+                "default": 1.5,
+                "description": "Multiplies the hourly cost after hours.",
+                "maximum": 3,
+                "minimum": 1,
+                "title": "Overtime Factor",
+                "type": "number"
+              }
+            },
+            "title": "FieldCrew",
+            "type": "object"
+          },
+          "FieldWorkType": {
+            "additionalProperties": false,
+            "description": "One kind of field work order: how much of it there is, what it takes and how soon it is due.",
+            "properties": {
+              "rate": {
+                "default": 1.0,
+                "description": "How much of this work there is (its meaning is in the setting's own description).",
+                "maximum": 500,
+                "minimum": 0,
+                "title": "Rate",
+                "type": "number"
+              },
+              "minutes": {
+                "default": 30.0,
+                "description": "Crew minutes on site per order (travel is added for premise visits).",
+                "maximum": 10000,
+                "minimum": 1,
+                "title": "Minutes",
+                "type": "number"
+              },
+              "target_days": {
+                "default": 5.0,
+                "description": "Business days from the order's release to its due date (0: the same day; planned work is released on its scheduled day). Emergencies count calendar time: fractions of a day.",
+                "maximum": 365,
+                "minimum": 0,
+                "title": "Target Days",
+                "type": "number"
+              },
+              "materials": {
+                "default": 0.0,
+                "description": "Materials cost per order.",
+                "maximum": 500000,
+                "minimum": 0,
+                "title": "Materials",
+                "type": "number",
+                "x-unit": "$"
+              }
+            },
+            "title": "FieldWorkType",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The work the field crews do over the year and the crews that do it: customer emergencies, service orders (disconnects, reconnects, move-ins and move-outs), meter maintenance (seal exchanges, batteries, removals), preventative maintenance on the networks and capital construction (new sets, upgrades, main renewal). Work follows the year: collections, moves, VEE field visits, the contact centre's calls, the year's outages and leaks, the meters' install years and the town's assets. What the crews do changes the year: a disconnected or removed meter is not read or billed, an exchange registers a new meter, and maintenance left overdue fails (dead batteries, drifting meters, outages, gas leaks).",
+        "properties": {
+          "shift_start_hour": {
+            "default": 7.0,
+            "description": "Crews start their day (local time, business days).",
+            "maximum": 20,
+            "minimum": 0,
+            "title": "Shift Start Hour",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "shift_hours": {
+            "default": 8.0,
+            "description": "Hours in a crew's working day.",
+            "maximum": 16,
+            "minimum": 1,
+            "title": "Shift Hours",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "routing": {
+            "default": true,
+            "description": "Crews drive the town's streets: from the depot in the morning, job to job by the fastest route (the operations driving speeds), and back at the end of the day. Of the jobs equally urgent and due, a crew takes the nearest next. On-call responders drive from the depot and back. Off, or in a town without streets: every visit adds travel_minutes.",
+            "title": "Routing",
+            "type": "boolean"
+          },
+          "stop_minutes": {
+            "default": 5.0,
+            "description": "With routing: parking, walking to the asset and setting up at each stop, added to the drive.",
+            "maximum": 120,
+            "minimum": 0,
+            "title": "Stop Minutes",
+            "type": "number",
+            "x-unit": "min"
+          },
+          "travel_minutes": {
+            "default": 20.0,
+            "description": "Driving to the job and back, added to every visit without routing (and to the VEE field visits the run times).",
+            "maximum": 240,
+            "minimum": 0,
+            "title": "Travel Minutes",
+            "type": "number",
+            "x-unit": "min"
+          },
+          "callout_minutes": {
+            "default": 30.0,
+            "description": "After hours, the time an on-call responder takes to get on the road.",
+            "maximum": 240,
+            "minimum": 0,
+            "title": "Callout Minutes",
+            "type": "number",
+            "x-unit": "min"
+          },
+          "overtime_max_hours": {
+            "default": 3.0,
+            "description": "Most hours a crew works past its shift to finish same-day and overdue customer work (priority 1 and 2).",
+            "maximum": 12,
+            "minimum": 0,
+            "title": "Overtime Max Hours",
+            "type": "number",
+            "x-unit": "h"
+          },
+          "remote_switch_share": {
+            "default": 0.85,
+            "description": "Share of AMI electric meters with a remote connect switch: their disconnects, reconnects and move reads need no truck.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Remote Switch Share",
+            "type": "number"
+          },
+          "seal_years_electric": {
+            "default": 10,
+            "description": "Electric meter seal period: a lot whose seal expires this year is sampled.",
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Seal Years Electric",
+            "type": "integer",
+            "x-unit": "yr"
+          },
+          "seal_years_gas": {
+            "default": 10,
+            "description": "Gas meter seal period.",
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Seal Years Gas",
+            "type": "integer",
+            "x-unit": "yr"
+          },
+          "seal_sample_size": {
+            "default": 32,
+            "description": "Meters pulled and tested from each lot whose seal expires.",
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Seal Sample Size",
+            "type": "integer"
+          },
+          "seal_lot_pass_rate": {
+            "default": 0.8,
+            "description": "Share of lots that pass compliance sampling and are resealed; a failed lot is exchanged meter by meter before its seal expires.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Seal Lot Pass Rate",
+            "type": "number"
+          },
+          "battery_years": {
+            "default": 15,
+            "description": "Radio module battery life on gas and water meters, AMI and AMR (they have no mains power).",
+            "maximum": 40,
+            "minimum": 1,
+            "title": "Battery Years",
+            "type": "integer",
+            "x-unit": "yr"
+          },
+          "water_meter_life_years": {
+            "default": 15,
+            "description": "Water meters this old or older are due for replacement.",
+            "maximum": 60,
+            "minimum": 1,
+            "title": "Water Meter Life Years",
+            "type": "integer",
+            "x-unit": "yr"
+          },
+          "dead_battery_miss": {
+            "default": 0.9,
+            "description": "Share of reads a radio module misses once its battery has died (past its life and not replaced): estimates follow.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Dead Battery Miss",
+            "type": "number"
+          },
+          "failed_lot_drift": {
+            "default": 0.04,
+            "description": "Under-registration of a failed seal lot's meters, from the failed test until each is exchanged.",
+            "maximum": 0.5,
+            "minimum": 0,
+            "title": "Failed Lot Drift",
+            "type": "number"
+          },
+          "old_water_meter_drift": {
+            "default": 0.03,
+            "description": "Under-registration of water meters at or past their service life, until replaced (read at the start of the year).",
+            "maximum": 0.5,
+            "minimum": 0,
+            "title": "Old Water Meter Drift",
+            "type": "number"
+          },
+          "deferred_pole_failures": {
+            "default": 2.0,
+            "description": "Chance a year that a pole found needing replacement fails once its replacement is overdue (ten times as likely on a storm day): an outage.",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Deferred Pole Failures",
+            "type": "number"
+          },
+          "deferred_tree_faults": {
+            "default": 0.02,
+            "description": "Chance on a storm day that an overhead span overdue for trimming faults: an outage.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Deferred Tree Faults",
+            "type": "number"
+          },
+          "deferred_leak_escalation": {
+            "default": 1.0,
+            "description": "Chance a year that a leak found by survey becomes a public gas leak (odour calls, an emergency) once its repair is overdue.",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Deferred Leak Escalation",
+            "type": "number"
+          },
+          "renewed_main_break_factor": {
+            "default": 0.3,
+            "description": "A renewed main's breaks and leaks, as a share of the cast-iron main's it replaced: from the day the construction crew finishes a segment.",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Renewed Main Break Factor",
+            "type": "number"
+          },
+          "construction_start_month": {
+            "default": 4,
+            "description": "First month of the construction season (digging is frost-free).",
+            "maximum": 12,
+            "minimum": 1,
+            "title": "Construction Start Month",
+            "type": "integer"
+          },
+          "construction_end_month": {
+            "default": 11,
+            "description": "Last month of the construction season.",
+            "maximum": 12,
+            "minimum": 1,
+            "title": "Construction End Month",
+            "type": "integer"
+          },
+          "crew_emergency": {
+            "$ref": "#/$defs/FieldCrew",
+            "default": {
+              "per_1000_premises": 0.4,
+              "cost_per_hour": 110.0,
+              "overtime_factor": 1.5
+            },
+            "description": "Gas odour and no-supply calls, any hour of any day.",
+            "title": "On-call responders"
+          },
+          "crew_meter": {
+            "$ref": "#/$defs/FieldCrew",
+            "default": {
+              "per_1000_premises": 0.3,
+              "cost_per_hour": 75.0,
+              "overtime_factor": 1.5
+            },
+            "description": "Disconnects, reconnects, move visits, exchanges, batteries, removals, investigations, meter sets.",
+            "title": "Meter technicians"
+          },
+          "crew_electric": {
+            "$ref": "#/$defs/FieldCrew",
+            "default": {
+              "per_1000_premises": 0.15,
+              "cost_per_hour": 165.0,
+              "overtime_factor": 1.5
+            },
+            "description": "Pole work, tree trimming, outage repairs, service upgrades.",
+            "title": "Electric line crews"
+          },
+          "crew_water": {
+            "$ref": "#/$defs/FieldCrew",
+            "default": {
+              "per_1000_premises": 0.15,
+              "cost_per_hour": 140.0,
+              "overtime_factor": 1.5
+            },
+            "description": "Valves, hydrants, main break repairs.",
+            "title": "Water crews"
+          },
+          "crew_gas": {
+            "$ref": "#/$defs/FieldCrew",
+            "default": {
+              "per_1000_premises": 0.08,
+              "cost_per_hour": 150.0,
+              "overtime_factor": 1.5
+            },
+            "description": "Leak surveys, regulator stations, leak repairs.",
+            "title": "Gas crews"
+          },
+          "crew_construction": {
+            "$ref": "#/$defs/FieldCrew",
+            "default": {
+              "per_1000_premises": 0.08,
+              "cost_per_hour": 230.0,
+              "overtime_factor": 1.5
+            },
+            "description": "Contractors: new services, main renewal.",
+            "title": "Construction crews"
+          },
+          "gas_odour": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 45.0,
+              "target_days": 0.041666666666666664,
+              "materials": 0.0
+            },
+            "description": "Gas odour investigation: share of gas odour reports (a leak's first report, every background report) a responder attends.",
+            "title": "Gas odour"
+          },
+          "no_supply": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.6,
+              "minutes": 60.0,
+              "target_days": 0.16666666666666666,
+              "materials": 40.0
+            },
+            "description": "No supply at one premise (a service fault, a blown fuse, a curb stop): share of single-premise outage reports that need a truck."
+          },
+          "outage_repair": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 120.0,
+              "target_days": 1.0,
+              "materials": 900.0
+            },
+            "description": "Repair of the year's outages and leaks (the incident model times it): share recorded against the utility's crew.",
+            "title": "Outage and leak repair"
+          },
+          "disconnect": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 30.0,
+              "target_days": 0.0,
+              "materials": 0.0
+            },
+            "description": "Disconnect for non-payment: share of collections disconnections worked (AMI electric with a switch is done remotely)."
+          },
+          "reconnect": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 30.0,
+              "target_days": 1.0,
+              "materials": 0.0
+            },
+            "description": "Reconnect after payment: share of reconnections worked, due the next business day."
+          },
+          "move_out": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 20.0,
+              "target_days": 1.0,
+              "materials": 0.0
+            },
+            "description": "Move-out final read or lock-off: share of account closings at a premise with a meter that cannot be read remotely.",
+            "title": "Move-out read"
+          },
+          "move_in": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.5,
+              "minutes": 25.0,
+              "target_days": 1.0,
+              "materials": 0.0
+            },
+            "description": "Move-in turn-on or first read: share of account openings at a premise with a meter that cannot be read remotely.",
+            "title": "Move-in read"
+          },
+          "meter_investigation": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 40.0,
+              "target_days": 10.0,
+              "materials": 0.0
+            },
+            "description": "VEE field visit (the run decides when): share recorded against the meter technicians."
+          },
+          "corrective_exchange": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 60.0,
+              "target_days": 10.0,
+              "materials": 140.0
+            },
+            "description": "Faulty meter exchanged on a field visit (the run decides when): share recorded."
+          },
+          "seal_exchange": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 45.0,
+              "target_days": 20.0,
+              "materials": 140.0
+            },
+            "description": "Seal-expiry exchange: share of the meters due (the sample of every expiring lot, every meter of a failed lot) exchanged. A failed lot's meters are due by 31 December."
+          },
+          "ami_battery": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 20.0,
+              "target_days": 20.0,
+              "materials": 35.0
+            },
+            "description": "Module battery replacement on gas and water meters: share of batteries reaching their life this year.",
+            "title": "Module battery"
+          },
+          "water_meter_replacement": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.5,
+              "minutes": 45.0,
+              "target_days": 20.0,
+              "materials": 160.0
+            },
+            "description": "Water meter replacement by age: share of over-age water meters replaced this year."
+          },
+          "removal": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 2.0,
+              "minutes": 30.0,
+              "target_days": 10.0,
+              "materials": 0.0
+            },
+            "description": "Meter removal (vacant premise, service abandoned): removals per 1,000 premises a year.",
+            "title": "Meter removal"
+          },
+          "ami_conversion": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.0,
+              "minutes": 35.0,
+              "target_days": 20.0,
+              "materials": 180.0
+            },
+            "description": "AMI conversion: share of AMR and manually read meters converted to AMI this year (capital, priority 4).",
+            "title": "AMI conversion"
+          },
+          "pole_inspection": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.1,
+              "minutes": 15.0,
+              "target_days": 20.0,
+              "materials": 0.0
+            },
+            "description": "Pole inspection: share of poles inspected a year (0.1 is a ten-year cycle)."
+          },
+          "pole_replacement": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.03,
+              "minutes": 480.0,
+              "target_days": 40.0,
+              "materials": 2500.0
+            },
+            "description": "Pole replacement: share of inspected poles found needing replacement."
+          },
+          "tree_trimming": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.25,
+              "minutes": 25.0,
+              "target_days": 20.0,
+              "materials": 0.0
+            },
+            "description": "Tree trimming: share of overhead spans trimmed a year (minutes per span)."
+          },
+          "valve_exercise": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.25,
+              "minutes": 30.0,
+              "target_days": 20.0,
+              "materials": 0.0
+            },
+            "description": "Valve exercising: share of water and gas valves a year."
+          },
+          "valve_repair": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.05,
+              "minutes": 300.0,
+              "target_days": 20.0,
+              "materials": 1800.0
+            },
+            "description": "Valve repair: share of exercised valves found broken or stuck."
+          },
+          "hydrant_flush": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 40.0,
+              "target_days": 15.0,
+              "materials": 0.0
+            },
+            "description": "Hydrant flushing and inspection: share of hydrants a year (May to October).",
+            "title": "Hydrant flushing"
+          },
+          "hydrant_repair": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.04,
+              "minutes": 240.0,
+              "target_days": 10.0,
+              "materials": 900.0
+            },
+            "description": "Hydrant repair: share of flushed hydrants found defective."
+          },
+          "leak_survey": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.33,
+              "minutes": 90.0,
+              "target_days": 20.0,
+              "materials": 0.0
+            },
+            "description": "Gas leak survey: share of gas main length walked a year (minutes per km)."
+          },
+          "gas_leak_repair": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.15,
+              "minutes": 360.0,
+              "target_days": 15.0,
+              "materials": 800.0
+            },
+            "description": "Gas leak repair (grade 2): leaks found per surveyed km."
+          },
+          "regulator_inspection": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 180.0,
+              "target_days": 10.0,
+              "materials": 0.0
+            },
+            "description": "Regulator station inspection: share of stations (city gate, district regulators) a year."
+          },
+          "new_set": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.8,
+              "minutes": 480.0,
+              "target_days": 30.0,
+              "materials": 1500.0
+            },
+            "description": "New service: share of new-connection requests (the contact centre's new connection contacts) that go ahead; built in the construction season.",
+            "title": "New set (new service)"
+          },
+          "meter_set": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 1.0,
+              "minutes": 45.0,
+              "target_days": 5.0,
+              "materials": 250.0
+            },
+            "description": "Meter set on a finished new service: share set by a meter technician (the rest come with the contractor)."
+          },
+          "service_upgrade": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.04,
+              "minutes": 240.0,
+              "target_days": 20.0,
+              "materials": 900.0
+            },
+            "description": "Electric service upgrade: share of homes with an EV or electric heat upgrading a year."
+          },
+          "main_replacement": {
+            "$ref": "#/$defs/FieldWorkType",
+            "default": {
+              "rate": 0.02,
+              "minutes": 1440.0,
+              "target_days": 40.0,
+              "materials": 45000.0
+            },
+            "description": "Main renewal: share of cast-iron water and gas main length replaced a year (minutes and materials per 100 m).",
+            "title": "Main renewal"
+          }
+        },
+        "title": "Field work",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 19
+      }
+    },
+    {
+      "group": "kpi",
+      "legacyScope": "run",
+      "fields": [
+        "on_time_bill_days",
+        "timely_invoice_days",
+        "read_release_days",
+        "payment_grace_days",
+        "case_resolution_days"
+      ],
+      "schema": {
+        "additionalProperties": false,
+        "description": "The windows the KPIs count with: what makes an invoice on time, a read prompt, a case resolved in time, an invoice paid on time. They change the figures reported, never the run itself.",
+        "properties": {
+          "on_time_bill_days": {
+            "default": 3,
+            "description": "Operational invoice issue target: each due service must reach an issued invoice within this many whole calendar days of its scheduled read. Includes print lag; the saved setting key is retained for compatibility.",
+            "maximum": 60,
+            "minimum": 0,
+            "title": "Invoice issue target",
+            "type": "integer",
+            "x-effects": [
+              "invoices on time"
+            ],
+            "x-unit": "days"
+          },
+          "timely_invoice_days": {
+            "default": 5,
+            "description": "Invoice timeliness target used by the twin and Delayed invoices. Each due service must reach an issued invoice within this many whole calendar days of its scheduled read. Includes upstream holds and print lag.",
+            "maximum": 60,
+            "minimum": 1,
+            "title": "Timely Invoice Days",
+            "type": "integer",
+            "x-effects": [
+              "invoice timeliness",
+              "delayed invoices"
+            ],
+            "x-unit": "days"
+          },
+          "read_release_days": {
+            "default": 3,
+            "description": "A held read is released promptly when its case releases it to billing within this many calendar days of the scheduled read.",
+            "maximum": 90,
+            "minimum": 0,
+            "title": "Read Release Days",
+            "type": "integer",
+            "x-effects": [
+              "reads released promptly"
+            ],
+            "x-unit": "days"
+          },
+          "payment_grace_days": {
+            "default": 3,
+            "description": "An invoice is paid on time when it is settled within this many calendar days after its due date.",
+            "maximum": 60,
+            "minimum": 0,
+            "title": "Payment Grace Days",
+            "type": "integer",
+            "x-effects": [
+              "invoices paid on time"
+            ],
+            "x-unit": "days"
+          },
+          "case_resolution_days": {
+            "default": 5,
+            "description": "A case is resolved in time when it closes within this many business days of being raised.",
+            "maximum": 60,
+            "minimum": 0,
+            "title": "Case Resolution Days",
+            "type": "integer",
+            "x-effects": [
+              "cases resolved in time"
+            ],
+            "x-unit": "business days"
+          }
+        },
+        "title": "KPI definitions",
+        "type": "object",
+        "x-applies": "run",
+        "x-group": true,
+        "x-order": 26
+      }
+    }
+  ],
+  "physicalModules": [
+    {
+      "module": "utilsim/world/occupancy.py",
+      "description": "Dated physical occupancy, deliberately separate from commercial move-in/out.\n\nOpt-in additive tables; old worlds are unchanged until the first accepted command.\nAll scheduling, application and cancellation share the world's transaction boundary.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-occupancy/1"
+      }
+    },
+    {
+      "module": "utilsim/world/storms.py",
+      "description": "Explicit dated weather/risk scenarios, consumed by the existing daily owner.",
+      "hostedAdapterAvailable": true,
+      "constants": {
+        "VERSION": "world-storms/1",
+        "FAMILIES": [
+          "electric",
+          "gas",
+          "water",
+          "sewer"
+        ],
+        "COMMON": [
+          "action",
+          "actorId",
+          "causalReference",
+          "commandId",
+          "effectiveDate",
+          "environmentId",
+          "expectedRevision",
+          "reason",
+          "schemaVersion",
+          "worldFingerprint"
+        ]
+      },
+      "hostedRoutes": [
+        "GET /hosted/worlds/{id}/events/storms",
+        "POST /hosted/worlds/{id}/events/storms"
+      ]
+    },
+    {
+      "module": "utilsim/world/hazards.py",
+      "description": "Opt-in, explainable infrastructure age and cold-weather failure modifiers.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-hazards/1",
+        "FIELDS": {
+          "ageYears": [
+            0,
+            10000
+          ],
+          "annualAgeIncrease": [
+            0,
+            1
+          ],
+          "coldBelowC": [
+            -80,
+            60
+          ],
+          "coldMultiplier": [
+            1,
+            100
+          ]
+        },
+        "FAMILIES": [
+          "electric",
+          "gas",
+          "water",
+          "sewer"
+        ]
+      }
+    },
+    {
+      "module": "utilsim/world/water_faults.py",
+      "description": "Durable downstream water leaks; physical repair is not an enterprise report.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-water-faults/1",
+        "DEFAULT_POLICY": {
+          "annualProbability": 0.0,
+          "leakM3PerHour": "0.05",
+          "revision": 0,
+          "cause": null
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/water_mains.py",
+      "description": "Durable, opt-in water-main breaks. Administrator physical truth only.\n\nSaved valves bound isolation; configured source connectivity determines supply.\nLoss is a configured scenario rate, not a hydraulic pressure calculation.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-water-mains/1",
+        "DEFAULT_POLICY": {
+          "breaksPer100kmYear": 0,
+          "lossM3PerHour": "10",
+          "revision": 0,
+          "cause": null
+        },
+        "TRANSITIONS": {
+          "isolate": [
+            "broken",
+            "isolated"
+          ],
+          "repair": [
+            "isolated",
+            "repaired"
+          ],
+          "restore": [
+            "repaired",
+            "restored"
+          ]
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/network_faults.py",
+      "description": "Opt-in physical supply interruptions on the saved electricity and gas graphs.\n\nConnectivity is an illustrative supply model, not a power-flow or gas-pressure solver.\nOnly administrator views expose fault truth. Meter exports remain observations.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-network-faults/1",
+        "DEFAULT_POLICY": {
+          "annualProbability": 0.0,
+          "revision": 0,
+          "cause": null
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/sewer.py",
+      "description": "Sanitary lateral truth: water-derived inflow, blockages, storage and overflow.\n\nThis opt-in model has no sewer meters and never changes observation-derived bills.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-sewer/1",
+        "DEFAULT_POLICY": {
+          "annualProbability": 0.0,
+          "returnFactor": "0.9",
+          "storageM3": "0.25",
+          "blockedCapacityM3PerDay": "0",
+          "revision": 0,
+          "cause": null
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/contacts.py",
+      "description": "Customer experience, awareness and contact intent, separate from agent handling.\n\nOnly experienced supply loss / visible overflow can trigger this first version.\nAn internal fault, missing meter transmission or unreceived bill is not awareness.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-contacts/1",
+        "DEFAULT_POLICY": {
+          "active": false,
+          "noticeProbabilityPerDay": 0.5,
+          "deliveryDelaySeconds": 86400,
+          "repeatAfterDays": 3,
+          "maxContacts": 3,
+          "revision": 0,
+          "cause": null
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/customer_finance.py",
+      "description": "Simulated customer cash and intentions; never enterprise billing or posting.\n\nInbound delivery/receipt functions are trusted adapter boundaries, not public\nadministrator commands. Adapters must authenticate their producer and recipient.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-customer-finance/1",
+        "POLICY": [
+          "active",
+          "cashCents",
+          "customerKind",
+          "essentialReserveCents",
+          "maxPaymentCents",
+          "paymentProbability",
+          "recipientRef"
+        ],
+        "COMMON": [
+          "action",
+          "actorId",
+          "causalReference",
+          "commandId",
+          "effectiveDate",
+          "environmentId",
+          "expectedRevision",
+          "premiseId",
+          "reason",
+          "runId",
+          "schemaVersion",
+          "worldFingerprint"
+        ]
+      }
+    },
+    {
+      "module": "utilsim/world/customer_cashflow.py",
+      "description": "Administrator-configured recurring cashflows within the existing finance owner.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-customer-cashflow/1",
+        "POLICY": [
+          "active",
+          "essentialExpense",
+          "income",
+          "incomeOverflowPolicy",
+          "insufficientCashPolicy"
+        ],
+        "COMMON": [
+          "action",
+          "actorId",
+          "causalReference",
+          "commandId",
+          "effectiveDate",
+          "environmentId",
+          "expectedRevision",
+          "premiseId",
+          "reason",
+          "recipientRef",
+          "runId",
+          "schemaVersion",
+          "worldFingerprint"
+        ]
+      }
+    },
+    {
+      "module": "utilsim/world/customer_notices.py",
+      "description": "Customer-owned financial contact intentions from actually delivered notices.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-customer-notices/1",
+        "DEFAULT_POLICY": {
+          "active": false,
+          "noticeProbabilityPerDay": 0.5,
+          "deliveryDelaySeconds": 86400,
+          "repeatAfterDays": 3,
+          "maxContacts": 3
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/development.py",
+      "description": "Opt-in construction on saved vacant premises; no invented geography or services.\n\nCall apply_due BEFORE occupancy.apply_due inside the existing daily transaction.\nThe notification boundary deliberately excludes occupancy counts and private causes.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-development/1"
+      }
+    },
+    {
+      "module": "utilsim/world/cruise.py",
+      "description": "Bounded local clock ownership: field visits, then one committed physical day.\n\nNo network delivery or enterprise work is performed. The shared runtime remains\nthe only clock owner for worlds configured for managed observation delivery.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "world-cruise/1"
+      }
+    },
+    {
+      "module": "utilsim/world/delivery.py",
+      "description": "World-owned observation outbox. Acceptance is distinct from business processing.\n\nThe scheduler owns actor authentication and recipient deduplication. Only committed,\nobservation-only messages leave this store; no recipient database is opened here.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {}
+    },
+    {
+      "module": "utilsim/world/exchange.py",
+      "description": "Versioned observation-only export with explicit derived sewer service.\n\nSewer is calculated from observed water use. No sewer meter is fabricated and\nhidden actual consumption is never used to fill missing observations.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {}
+    },
+    {
+      "module": "utilsim/world/field_execution.py",
+      "description": "Assignment-bound field visits, physical repairs, and independent report delivery.\n\nThis local simulator has no enterprise queue access or network transport. Only\nan administrator can register crews and accept assignments; a crew can execute\nits persisted assignment. Public reports contain on-site findings, never fault\nmodel state or consumption truth. Receipt acceptance is transport acknowledgement,\nnot an enterprise decision to accept evidence or close an order.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "field-world-execution/1"
+      }
+    },
+    {
+      "module": "utilsim/world/field_reporting.py",
+      "description": "Independent simulator reporting claims; physical visits remain truthful.\n\nActor IDs are local simulator principals. A transport must authenticate callers\nand must not grant workers this owner's physical world reference or admin view.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "field-reporting/1",
+        "DEFAULT": {
+          "policyRevision": 0,
+          "reportMode": "automatic",
+          "workMode": "perform"
+        }
+      }
+    },
+    {
+      "module": "utilsim/world/field_travel.py",
+      "description": "Read-only saved-road quotes; no reservation, scheduling or physical effects.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "field-travel-quote/1"
+      }
+    },
+    {
+      "module": "utilsim/world/field_water_mains.py",
+      "description": "Immutable phase dependencies in the existing field owner, not a work queue.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "field-main-phases/1"
+      }
+    },
+    {
+      "module": "utilsim/world/field_cancellation.py",
+      "description": "Explicit cancellation and replacement of pending local main-phase work.",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "field-assignment-lifecycle/1"
+      }
+    },
+    {
+      "module": "utilsim/world/field_managed.py",
+      "description": "Opt-in field broker for an authenticated external Run, not a scheduler.\n\nThe composition root supplies trusted, live authority and calendar callbacks.\nNeither callback may be populated from an HTTP request or worker payload. See\nWORLD_FIELD_MANAGED.md for the deliberately small integration contract.\n",
+      "hostedAdapterAvailable": false,
+      "constants": {
+        "VERSION": "field-managed/1"
+      }
+    }
+  ],
+  "userRequirements": {
+    "physicalAndCustomerSetup": [
+      "AMI/AMR/manual mix",
+      "housing age distribution",
+      "customer behavior",
+      "household financial circumstances",
+      "physical utility-operation assumptions"
+    ],
+    "externalOwnership": [
+      "enterprise staffing",
+      "processing throughput",
+      "queues",
+      "billing and operational decisions"
+    ],
+    "controls": "Sliders with preset markers, exact numeric entry, units, effect descriptions and relative stress where meaningful; linked tech shares total100%",
+    "scopeNote": "Five initialization fields are not final product scope; classify fields by effect, not legacy group names."
+  }
+}

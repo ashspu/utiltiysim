@@ -77,6 +77,19 @@ def main():
         original = read_json(package / 'bindings.json')['premises']
         assert {(b['parcelId'], b['premiseId'], tuple(b['meterIds'])) for b in bindings} == {
             (b['parcelId'], b['premiseId'], tuple(b['meterIds'])) for b in original}
+        storm_path = base + '/events/storms'
+        assert call('GET', storm_path)['enabled'] is False
+        storm = {'commandId': str(uuid.uuid4()), 'expectedRevision': 0, 'effectiveDate': first['through'],
+                 'action': 'schedule', 'reason': 'Accepted-map physical weather QA', 'causalReference': 'isolated-http-qa',
+                 'startDate': '2026-07-16', 'endDate': '2026-07-17', 'temperatureOffsetC': -10,
+                 'multipliers': dict.fromkeys(('electric', 'gas', 'water', 'sewer'), 2)}
+        storm_receipt = call('POST', storm_path, json=storm)
+        cancelled_storm = {**storm, 'commandId': str(uuid.uuid4()), 'expectedRevision': 1,
+                           'startDate': '2026-07-17', 'endDate': '2026-07-18'}
+        cancelled_receipt = call('POST', storm_path, json=cancelled_storm)
+        cancellation = {k: cancelled_storm[k] for k in ('effectiveDate', 'reason', 'causalReference')}
+        cancellation.update(commandId=str(uuid.uuid4()), expectedRevision=2, action='cancel', stormId=cancelled_receipt['stormId'])
+        call('POST', storm_path, json=cancellation)
         advanced = call('POST', base + '/advance', json={'through': '2026-07-17'})
         assert advanced['days'] == 2 and advanced['observations'] > 0
         assert call('GET', '/hosted/worlds/' + second['id'])['days'] == 0
@@ -87,6 +100,18 @@ def main():
         assert resumed['configuration'] == first['configuration']
         assert resumed['fingerprint'] == first['fingerprint'] and resumed['through'] == advanced['through']
         assert call('POST', '/hosted/worlds', json=value)['id'] == first['id']
+        storm_history = call('GET', storm_path)
+        assert len(storm_history['history']) == 1
+        applied = storm_history['history'][0]
+        assert applied['stormId'] == storm_receipt['stormId']
+        assert applied['temperatureC'] == round(applied['baselineTemperatureC'] - 10, 2)
+        assert call('POST', storm_path, json=storm) == storm_receipt
+        assert call('POST', storm_path, json=cancelled_storm) == cancelled_receipt
+        assert next(e for e in storm_history['events'] if e['stormId'] == cancelled_receipt['stormId'])['cancelledEventId']
+        assert client.post(storm_path, json={**cancellation, 'commandId': str(uuid.uuid4()), 'expectedRevision': 3,
+                                           'effectiveDate': resumed['through'], 'stormId': storm_receipt['stormId']}).status_code == 422
+        assert 'StormWeatherApplied' in {e['type'] for e in call('GET', base + '/events')['events']}
+        assert call('GET', '/hosted/worlds/' + second['id'] + '/events/storms')['history'] == []
         picks = []
         for kind in sorted({p.get('premiseType', 'unknown') for p in original}):
             binding = next(p for p in original if p.get('premiseType', 'unknown') == kind)
@@ -103,7 +128,11 @@ def main():
                   'sourceWorldChecked': source_world.exists(), 'counts': first['counts'], 'independentWorldIds': [first['id'], second['id']],
                   'restartResumedThrough': resumed['through'], 'observations': resumed['observations'], 'premiseChecks': picks,
                   'configurationRoundtrip': True, 'actualProcessRestart': True, 'idempotentCreate': True,
-                  'principalIsolation': True, 'mapAndMeterBindingsExact': True, 'hostedDeployed': False}
+                  'principalIsolation': True, 'mapAndMeterBindingsExact': True, 'hostedDeployed': False,
+                  'stormLoop': {'scheduled': True, 'cancelledBeforeStart': True, 'startedCancellationRejected': True,
+                                'exactRetryAfterRestart': True, 'appliedDays': len(storm_history['history']),
+                                'baselineTemperatureC': applied['baselineTemperatureC'], 'temperatureC': applied['temperatureC'],
+                                'temperatureOffsetC': applied['temperatureOffsetC'], 'riskMultipliers': applied['multipliers']}}
         Path(args.report).write_text(json.dumps(report, indent=2), encoding='utf-8')
         print(json.dumps(report, indent=2))
     finally:

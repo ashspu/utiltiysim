@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from utilsim.config.wizard import world_configuration
+from utilsim.world import storms
 from utilsim.world.map_view import WorldMap
 
 from .library import HostedLibrary
@@ -178,6 +179,33 @@ def create_app(root, token):
         if not 0 < (date.fromisoformat(end) - date.fromisoformat(start)).days <= 31:
             raise ValueError('Read one to 31 days per request.')
         return library.library.world(identity).export(start, end)
+
+    @app.get('/hosted/worlds/{identity}/events')
+    def events(identity: str, request: Request, before: int | None = Query(None, ge=1, le=9223372036854775807),
+               limit: int = Query(25, ge=1, le=50)):
+        owned(identity, request)
+        world = library.library.world(identity)
+        with world.read_db() as db:
+            through = world.metadata(db)['through']
+            rows = [dict(r) for r in db.execute(
+                'SELECT sequence,id,day,type,subject,cause,payload FROM events WHERE sequence<? '
+                'ORDER BY sequence DESC LIMIT ?', (before or 9223372036854775807, limit + 1))]
+        for row in rows:
+            row['payload'] = json.loads(row['payload'])
+        return {'worldInstanceId': identity, 'view': 'administrator-truth', 'through': through,
+                'events': rows[:limit], 'nextBefore': rows[limit - 1]['sequence'] if len(rows) > limit else None}
+
+    @app.get('/hosted/worlds/{identity}/events/storms')
+    def storm_history(identity: str, request: Request, before: str | None = None,
+                      eventsBefore: str | None = None, limit: int = Query(25, ge=1, le=50)):
+        owned(identity, request)
+        return {'worldInstanceId': identity,
+                **storms.inspect(library.library.world(identity), before=before, limit=limit, events_before=eventsBefore)}
+
+    @app.post('/hosted/worlds/{identity}/events/storms')
+    def storm_action(identity: str, request: Request, value: dict = Depends(body)):
+        row = owned(identity, request, 'advance')
+        return library.storm_command(row, value)
 
     @app.post('/hosted/worlds/{identity}/advance')
     def advance(identity: str, request: Request, value: dict = Depends(body)):

@@ -4,12 +4,14 @@ import math
 import re
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 
 from utilsim.config.wizard import world_configuration
 from utilsim.worker import world_creation
 from utilsim.worker.worlds import WorldLibrary
+from utilsim.world import cruise, storms
 from utilsim.world.map_view import WorldMap
 from utilsim.world.store import MODEL_VERSION, World, canonical
 
@@ -34,6 +36,17 @@ def configuration(value):
                 raise ValueError('World setting outside supported bounds.')
         defaults[group].update(fields)
     return {'world': defaults}
+
+
+class ManagedWorld(World):
+    """Open an already registered world without constructor schema writes.
+
+    Creation owns initialization. Domain commands perform their own explicit
+    migrations; invalid commands and inspection must not migrate a database.
+    """
+    def __init__(self, registered):
+        with registered.read_db():
+            self.path = str(registered.path)
 
 
 class HostedLibrary:
@@ -136,7 +149,9 @@ class HostedLibrary:
         result = {'id': row['id'], **{k: request[k] for k in ('name', 'sourceId', 'sourceRevision', 'start', 'configuration')},
                   'townId': manifest['townId'], 'grantTownId': manifest['grantTownId'], 'counts': manifest['counts'], 'snapshotSha256': manifest['snapshotSha256'],
                   'paths': {k: base + suffix for k, suffix in {'status': '', 'snapshot': '/map/snapshot',
-                            'bindings': '/map/bindings', 'advance': '/advance', 'observations': '/observations'}.items()},
+                            'bindings': '/map/bindings', 'advance': '/advance', 'observations': '/observations',
+                            'events': '/events', 'storms': '/events/storms'}.items()},
+                  'capabilities': {'stormEvents': storms.VERSION, 'advanceMode': 'synchronous', 'backgroundJobs': False},
                   'configurationRevision': 1, 'configurationEditable': False}
         with self.library.db() as db:
             state = db.execute('SELECT state FROM world_creations WHERE command=?', (row['id'],)).fetchone()[0]
@@ -155,12 +170,42 @@ class HostedLibrary:
             return db.execute('SELECT * FROM hosted_worlds WHERE principal=? ORDER BY rowid DESC', (principal,)).fetchall()
 
     def advance(self, row, through):
-        readonly = self.library.world(row['id'])
-        state = WorldMap(readonly).status()
-        if not isinstance(through, str) or date.fromisoformat(through).isoformat() != through:
-            raise ValueError('Use a canonical through date.')
-        days = (date.fromisoformat(through) - date.fromisoformat(state['through'])).days
-        if not 0 <= days <= 31:
-            raise ValueError('Advance zero to 31 days per request; the clock cannot rewind.')
-        World(readonly.path).advance(through)
+        with self.manual_world(row) as world:
+            state = WorldMap(world).status()
+            if not isinstance(through, str) or date.fromisoformat(through).isoformat() != through:
+                raise ValueError('Use a canonical through date.')
+            days = (date.fromisoformat(through) - date.fromisoformat(state['through'])).days
+            if not 0 <= days <= 31:
+                raise ValueError('Advance zero to 31 days per request; the clock cannot rewind.')
+            world.advance(through)
         return self.describe(row)
+
+    @contextmanager
+    def manual_world(self, row):
+        readonly = self.library.world(row['id'])
+        # Same lock order and clock ownership as the original local controls.
+        with cruise.manual_control(readonly):
+            with readonly.read_db() as db:
+                if db.execute('SELECT 1 FROM observation_delivery_configuration LIMIT 1').fetchone():
+                    raise ValueError('Shared delivery owns this clock; use its configured runtime controls.')
+            yield ManagedWorld(readonly)
+
+    def storm_command(self, row, value):
+        common = {'commandId', 'expectedRevision', 'effectiveDate', 'action', 'reason', 'causalReference'}
+        extra = {'schedule': {'startDate', 'endDate', 'temperatureOffsetC', 'multipliers'},
+                 'cancel': {'stormId'}}.get(value.get('action')) if isinstance(value.get('action'), str) else None
+        if extra is None or set(value) != common | extra:
+            raise ValueError('Provide only the supported storm schedule or cancellation fields.')
+        try:
+            command_id = str(uuid.UUID(value['commandId']))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ValueError('A storm command UUID is required.') from exc
+        with self.manual_world(row) as world:
+            with world.read_db() as db:
+                meta = world.metadata(db)
+            # The HTTP boundary already verified principal ownership and current grants.
+            # Local actor/identity fields are trusted adapter inputs, never browser authority.
+            payload = {**value, 'commandId': command_id, 'schemaVersion': storms.VERSION,
+                       'environmentId': meta['environment'], 'worldFingerprint': meta['fingerprint'],
+                       'actorId': 'world-admin'}
+            return storms.command(world, payload)

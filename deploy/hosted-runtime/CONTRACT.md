@@ -44,6 +44,35 @@ Exclude Studio year runs, billing, tariff processing, collections, VEE, staffing
 
 One runtime replica and one worker are the initial deployment contract. Never use Vercel Function temporary disk, network filesystem SQLite locking without verification, browser storage, or the shared demonstration world as persistence. Back up journal, templates and world databases consistently. Production gateway timeout/job scheduling and large-world load limits remain acceptance work before deployment.
 
-## Ownership
+## Storm events (follow-up adapter)
+
+GET `/hosted/worlds/{id}/events?before=<sequence>&limit=25` returns `{worldInstanceId,view:'administrator-truth',through,events:[{sequence,id,day,type,subject,cause,payload}],nextBefore}`. This is the physical event journal, not the observation-only enterprise feed. Limit 1–50; nextBefore is the oldest returned sequence when older records exist.
+
+GET `/hosted/worlds/{id}/events/storms?before=YYYY-MM-DD&eventsBefore=<sequence>&limit=25` returns the existing `storms.inspect` result plus `worldInstanceId`: `modelVersion:'world-storms/1',enabled,environmentId,worldFingerprint,through,revision,events,history,nextBefore,nextEventsBefore,view`. `events` holds schedules including cancelledEventId; `history` holds actual applied storm days with baseline/adjusted temperature, offset, risk multipliers and causal IDs. Date cursor pages applied days, integer cursor pages schedules. Inspection does not activate the storm model.
+
+POST the same `/events/storms` path with:
+
+```json
+{
+  "commandId": "a UUID",
+  "expectedRevision": 0,
+  "effectiveDate": "2026-07-15",
+  "action": "schedule",
+  "reason": "Summer weather stress scenario",
+  "causalReference": "operator-scenario",
+  "startDate": "2026-07-16",
+  "endDate": "2026-07-18",
+  "temperatureOffsetC": -10,
+  "multipliers": {"electric": 2, "gas": 2, "water": 2, "sewer": 2}
+}
+```
+
+For cancellation, use action `cancel` and `stormId` instead of startDate/endDate/temperatureOffsetC/multipliers. All six common fields remain required. UUIDs are canonicalized. The server injects schemaVersion, local actor, environment and fingerprint after principal/owner-or-operator grant checks; browser-supplied identity fields are rejected. POST returns the engine receipt `{commandId,stormId,status:'completed',revision,eventId,effectiveDate,modelVersion}`. Exact retry after advance/restart returns the original receipt. Changed command reuse, stale date/revision, overlap, invalid ranges and cancellation after any affected day is processed return 422.
+
+End dates are exclusive UTC days. Duration 1–90 days, temperature offset −40…40°C, exactly four risk multipliers each 1–100. Zero baseline fault risk stays zero; scheduling does not turn on fault models. This is temperature/risk stress, not rain/wind/flood physics. Daily effects and readings commit with the existing engine day. No new scheduler, background jobs or fake progress. Status advertises `capabilities:{stormEvents:'world-storms/1',advanceMode:'synchronous',backgroundJobs:false}` and adds `paths.events` / `paths.storms`.
+
+Manual advancement and storm mutation use the existing cruise lock and reject worlds owned by cruise or managed delivery. Invalid commands do not invoke constructor migrations. World inspection remains read-only. The accepted-map source stays unchanged.
+
+## Ownership and source scope
 
 Backend chat `01a12bf4-9f78-7411-ac48-15750ae1d151` owns `utilsim/hosted/`, its tests and `deploy/hosted-runtime/`. Shell chat `01a12acd-01bf-7801-b837-d651ab299083` owns UI, WorkOS gateway and canonical Vercel release. Coordinator `01a12759-bb9e-79b1-b1b9-32f0a5864e10` coordinates online draft storage. Standing coordination authorization: Greg, 2026-10-11, chat `01a12aa3-5c1e-7142-aad0-dd177c7c9f09`.
