@@ -4,7 +4,7 @@ import { initializationProgress, retainCreationResult, completedStartMatches } f
 const status = document.getElementById('account-status'), root = document.getElementById('workspace-content');
 let catalog, selected, draft, form, session, dirty = false, saveCommand = null;
 const isOwner = () => session.grants.some(g => g.role === 'owner');
-const worldLink = id => /^[0-9a-f]{32}$/.test(id || '') ? `/world-control.html?id=${id}` : null;
+const worldLink = id => /^[0-9a-f]{32}$/.test(id || '') ? `/city.html?id=${id}` : null;
 const startKey = setup => `utilitysim:start:${session.user.id}:${setup.id}`;
 function readStart(setup) {
   const value = sessionStorage.getItem(startKey(setup));
