@@ -1,8 +1,8 @@
-// The illustrated preview is not a parcel hit-test map. This selector uses the
-// saved world's actual premise IDs and never guesses locations or commercial IDs.
+// Both the map and selector inspect saved-world premise IDs.
+// Commercial IDs and current occupancy come from the owned runtime.
 export function createPremisePanel(root,request) {
   const title=document.createElement('h2');title.textContent='Explore a premise';
-  const help=document.createElement('p');help.textContent='Choose an actual premise from this saved world. Its illustration is a preview; the premise records retain the pinned map identity.';
+  const help=document.createElement('p');help.textContent='Choose an actual premise from this saved world. Select a property on the map or choose a premise here to inspect its saved records.';
   const label=document.createElement('label');label.textContent='Premise';label.setAttribute('for','premise-selector');
   const select=document.createElement('select');select.id='premise-selector';
   const inspect=document.createElement('button');inspect.textContent='Inspect premise';
@@ -32,5 +32,5 @@ export function createPremisePanel(root,request) {
     message.textContent=connected?'Premise confirmed. Virtual Systems resolves its commercial mapping and checks your current access.':'Premise confirmed. This world has no configured Virtual Systems connection.';
   }catch(error){if(version===generation)message.textContent=error.message;}finally{if(version===generation){busy=false;controls();}}}
   inspect.onclick=inspectSelected;more.onclick=page;select.onchange=()=>{detail.replaceChildren();link.hidden=true;};
-  clear();return {clear,async load(value){clear();if(!value?.available)return;world=value;await page();}};
+  clear();return {clear,async selectPremise(id){if(!world||busy)return;let option=[...select.options].find(o=>o.value===id);if(!option){option=document.createElement('option');option.value=id;option.textContent=id;select.append(option);}select.value=id;await inspectSelected();},async load(value){clear();if(!value?.available)return;world=value;await page();}};
 }

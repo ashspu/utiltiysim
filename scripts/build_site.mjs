@@ -15,6 +15,7 @@ for (const file of ['workspace.html','workspace.js','workspace.css','workspace-s
 for (const file of ['physical-slider-form.mjs','physical-slider-form.css']) shellFiles.add(file);
 for (const file of ['compute-connection.html','compute-connection.js','compute-connection.css','world-control.html','world-control.js','world-control.css','world-control-core.mjs','world-control-events.mjs','world-control-sentiment.mjs','world-control-connected.mjs','world-control-connected-state.mjs','world-control-connected-view.mjs']) shellFiles.add(file);
 for (const file of ['world-control-premises.mjs','vs-operator.html','vs-operator.js','vs-operator.css','vs-operator-core.mjs']) shellFiles.add(file);
+shellFiles.add('world-control-map.mjs');
 const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
 const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
 const workspaceAssets = new Set(['lantern-harbour-welcome.webp','lantern-harbour-welcome-small.webp']);
@@ -62,6 +63,11 @@ fs.cpSync(web, out, {recursive: true, filter(source) {
   if (!townIds.has(relative[1])) return false;
   return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]) || relative[2] === 'setup-preview.jpg';
 }});
+const explore=path.join(web,'presets/lantern-bay-500/explore');
+const proof=JSON.parse(fs.readFileSync(path.join(explore,'manifest.json'),'utf8'));
+const {createHash}=await import('node:crypto');
+for(const [file,digest] of Object.entries(proof.files)){if(file.includes('..')||createHash('sha256').update(fs.readFileSync(path.join(explore,file))).digest('hex')!==digest)throw Error('Reviewed map asset changed: '+file);}
+fs.cpSync(explore,path.join(out,'presets/lantern-bay-500/explore'),{recursive:true});
 fs.writeFileSync(path.join(out, 'index.html'), welcomeHtml);
 // Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.
 for (const file of ['index.html', 'library.html', 'workspace.html']) {

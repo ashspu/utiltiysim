@@ -4,6 +4,7 @@ import { grantsFor, permits } from '../server/permissions.mjs';
 import { catalog } from '../server/setup-drafts.mjs';
 import { fail, connectionStore, publicConnection, unsealCredential, runtimeRequest } from '../server/compute-connector.mjs';
 import { managedClock, validateConnectedCommand, publicConnectedStatus, publicConnectedReceipt } from '../server/connected-control.mjs';
+import { publicMapBindings } from '../server/map-projection.mjs';
 import { premiseQuery, publicPremises } from '../server/premise-projection.mjs';
 const worldId=/^[0-9a-f]{32}$/;
 const canonicalDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
@@ -20,7 +21,7 @@ export function createComputeHandler({env=process.env,client=cfg=>new WorkOS(cfg
   const owner=town=>grants.some(g=>g.role==='owner'&&(g.town==='*'||!town||g.town===town));
   const storage=store();
   if(action==='connection') {if(!owner())fail(403,'Owner access required.');return reply(res,200,{connection:publicConnection(req.method==='GET'?await storage.get(actor):await storage.save(actor,req.body))});}
-  if(!['test','worlds','create','status','advance','observations','storms','events','sentiment','connected','connected-command','premises','premise'].includes(action))fail(404,'Unknown compute action.');
+  if(!['test','worlds','create','status','advance','observations','storms','events','sentiment','connected','connected-command','premises','premise','map'].includes(action))fail(404,'Unknown compute action.');
   if(action==='test'&&!owner())fail(403,'Owner access required.');
   const connection=await storage.get(actor); if(!connection?.secret)fail(503,'Configure your runtime endpoint and credential first.');
   const token=unsealCredential(connection.secret,env.WORKOS_COOKIE_PASSWORD,actor);
@@ -29,12 +30,13 @@ export function createComputeHandler({env=process.env,client=cfg=>new WorkOS(cfg
   if(action==='test')path='/hosted/sources';
   if(action==='worlds') {const offset=url.searchParams.get('offset')||'0',limit=url.searchParams.get('limit')||'25';if(!/^\d{1,8}$/.test(offset)||!/^\d{1,2}$/.test(limit)||+limit<1||+limit>50)fail(422,'Invalid world pagination.');path=`/hosted/worlds?offset=${offset}&limit=${limit}`;}
   if(action==='create') {const source=catalog.sources.find(s=>s.id===body?.sourceId);if(!source||source.canConfigure!==true||source.sourceRevision!==body.sourceRevision)fail(409,'Select the current approved source revision.');if(!owner(source.grantTownId))fail(403,'Owner access to this source required.');path='/hosted/worlds';}
-  if(['status','advance','observations','storms','events','sentiment','connected','connected-command','premises','premise'].includes(action)) {
+  if(['status','advance','observations','storms','events','sentiment','connected','connected-command','premises','premise','map'].includes(action)) {
     const id=url.searchParams.get('id');if(!worldId.test(id||''))fail(422,'Invalid world identifier.');
     const status=await invoke('/hosted/worlds/'+id);if(status.status!==200)return reply(res,status.status,['connected','connected-command'].includes(action)?{detail:'The runtime could not confirm this world.',error:'World status unavailable.'}:status.data);
     const world=status.data, source=catalog.sources.find(s=>s.id===world.sourceId);
     if(!source||world.sourceRevision!==source.sourceRevision||world.grantTownId!==source.grantTownId)fail(409,'World source revision is not supported by this shell.');
     if(!permits(grants,(action==='advance'||action==='connected-command'||['storms','sentiment'].includes(action)&&req.method==='POST')?'world.advance':'world.view',source.grantTownId))fail(403,'Current world permission required.');
+    if(action==='map'){if(url.searchParams.getAll('id').length!==1)fail(422,'Choose one world.');const result=await invoke('/hosted/worlds/'+id+'/map/bindings');if(result.status!==200)return reply(res,result.status,{detail:'Saved map unavailable.'});return reply(res,200,publicMapBindings(result.data,world));}
     if(['premises','premise'].includes(action)) {
       const query=premiseQuery(url,action);if(world.id!==id)fail(502,'The selected world was not confirmed.');
       const result=await invoke('/hosted/worlds/'+id+'/premises'+(action==='premise'?'/'+encodeURIComponent(query.premiseId)+'/summary':`?offset=${query.offset}&limit=${query.limit}`));
