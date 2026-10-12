@@ -8,7 +8,11 @@ import { grantsFor, permits } from './permissions.mjs';
 const publicPaths = new Set(['/', '/index.html', '/landing.js', '/landing.css', '/welcome.js', '/welcome.css', '/style.css',
   '/brand/utility-studio-icon-color.svg', '/favicon.ico',
   ...['civic-welcome-landscape.png','civic-block-pine-willow.png','civic-city-studies.png','civic-block-maple-park.png','civic-block-main-north.png'].map(file => '/assets/' + file)]);
-const signedInPaths = new Set(['/workspace.html','/workspace.js','/workspace.css','/shell-session.js']);
+// The workspace must boot before it can explain missing/unverified grants.
+// Only its exact static dependencies belong here; maps and owner controls keep
+// their independent grant checks below.
+const signedInPaths = new Set(['/workspace.html','/workspace.js','/workspace.css','/shell-session.js',
+  '/viewer/setup.css','/physical-slider-form.css','/physical-slider-form.mjs','/workspace-start-state.mjs']);
 const townId = /^[a-z0-9][a-z0-9-]{0,99}$/;
 export function createPageAccess({ env = process.env, client = cfg => new WorkOS(cfg.apiKey, { clientId: cfg.clientId }), pass = next } = {}) {
   return async function pageAccess(request) {
