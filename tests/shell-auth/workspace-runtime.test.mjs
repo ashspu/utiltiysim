@@ -34,7 +34,7 @@ test('lost creation response and reload replay the original command and immutabl
   reloaded.queue.push({status:200,data:{id:'a'.repeat(32),available:true,state:'ready',initialization:{state:'complete',appliedCommands:0,totalCommands:0}}});
   await reloaded.ctx.actions.startSetup(reloaded.setup,button,feedback,runtime);
   assert.deepEqual(JSON.parse(reloaded.requests[0].options.body),first);
-  assert.match(feedback.innerHTML,/world-control\.html\?id=aaaaaaaa/);
+  assert.match(feedback.innerHTML,/city\.html\?id=aaaaaaaa/);
   assert.doesNotMatch(feedback.innerHTML,/template/);
   assert.equal(button.textContent,'Start new simulation from updated setup');
   reloaded.setup.revision=1; // Same completed revision reopens rather than duplicating.
@@ -57,7 +57,7 @@ test('configuring response survives reload and continues exact original payload 
   reloaded.queue.push({status:200,data:{id:identity,available:true,state:'ready',initialization:{state:'complete',appliedCommands:601,totalCommands:601}}});
   await reloaded.ctx.actions.startSetup(reloaded.setup,button,feedback,runtime);
   assert.deepEqual(JSON.parse(reloaded.requests[0].options.body),original);
-  assert.match(feedback.innerHTML,/world-control\.html\?id=bbbbbbbb/);
+  assert.match(feedback.innerHTML,/city\.html\?id=bbbbbbbb/);
   const completed=reloaded.ctx.actions.readStart(reloaded.setup);
   assert.equal(completed.worldId,identity);assert.equal(completed.pendingWorldId,undefined);
   assert.equal(button.textContent,'Start new simulation from updated setup');
@@ -105,5 +105,5 @@ test('completed older revision starts new independent world, uncertain older rev
   h.queue.push({status:200,data:{id:'b'.repeat(32),available:true}});
   await h.ctx.actions.startSetup(h.setup,button,feedback,runtime);
   assert.deepEqual(JSON.parse(h.requests[2].options.body),updated);
-  assert.match(feedback.innerHTML,/world-control\.html\?id=bbbbbbbb/);
+  assert.match(feedback.innerHTML,/city\.html\?id=bbbbbbbb/);
 });

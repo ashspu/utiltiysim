@@ -16,6 +16,7 @@ for (const file of ['physical-slider-form.mjs','physical-slider-form.css']) shel
 for (const file of ['compute-connection.html','compute-connection.js','compute-connection.css','world-control.html','world-control.js','world-control.css','world-control-core.mjs','world-control-events.mjs','world-control-sentiment.mjs','world-control-connected.mjs','world-control-connected-state.mjs','world-control-connected-view.mjs']) shellFiles.add(file);
 for (const file of ['world-control-premises.mjs','vs-operator.html','vs-operator.js','vs-operator.css','vs-operator-core.mjs']) shellFiles.add(file);
 shellFiles.add('world-control-map.mjs');
+for(const file of ['city.html','city.js','city.css'])shellFiles.add(file);
 const welcomeHtml = hostedWelcome(fs.readFileSync(path.join(web, 'index.html'), 'utf8'));
 const welcomeAssets = new Set([...welcomeHtml.matchAll(/src="\/assets\/([^"]+)"/g)].map(match => match[1]));
 const workspaceAssets = new Set(['lantern-harbour-welcome.webp','lantern-harbour-welcome-small.webp']);
