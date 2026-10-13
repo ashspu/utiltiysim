@@ -5,13 +5,13 @@ import { readSession } from './shell-session.js';
 import { createConnectedPanel } from './world-control-connected.mjs';
 import { ConnectedCommandController } from './world-control-connected-state.mjs';
 import { clockIsManaged, connectedView } from './world-control-connected-view.mjs';
+import { createWorldMap } from './world-control-map.mjs';
 import { createPremisePanel } from './world-control-premises.mjs';
 const $ = id => document.getElementById(id);
 let status = null, offset = 0, total = 0, reading = false;
 let connectedStatus = null, connectedCommands = null, connectedActor = null, canControl = false;
 let connectedRefreshing = false, pollTimer = null, pollRemaining = 0;
 let connectedPreflight = false;
-const catalogSources = fetch('/api/setups?view=catalog',{cache:'no-store'}).then(async response => response.ok ? (await response.json()).sources : []).catch(()=>[]);
 async function request(action, params = {}, body) {
   const response = await fetch(`/api/compute?${new URLSearchParams({ action, ...params })}`, {
     method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
@@ -27,6 +27,7 @@ const events = createStormPanel($('event-panel'), request, () => controls());
 const sentiment = createSentimentPanel($('sentiment-panel'), request, () => controls(), readSession().then(value=>value.user?.id).catch(()=>null));
 const connected = createConnectedPanel($('connected-panel'), connectedAction);
 const premises = createPremisePanel($('premise-panel'), request);
+const map = createWorldMap($('world-map'), request, id => premises.selectPremise(id));
 function message(value) { $('message').textContent = value; }
 function controls() {
   const managed = clockIsManaged(status), sending = controller.busy || connectedCommands?.busy || connectedPreflight;
@@ -66,15 +67,6 @@ function render(value) {
     const housing=profile.housing;
     $('profile-summary').textContent=[profile.meterChannelsEnabled?`Applied meter collections: AMI ${profile.meterCounts?.AMI??0}, AMR ${profile.meterCounts?.AMR??0}, manual ${profile.meterCounts?.MANUAL??0}.`:'',profile.housingAgeEnabled&&housing?.count?`Applied housing: ${housing.count} homes, ages ${housing.minAgeYears}–${housing.maxAgeYears} years, realised mean ${housing.meanAgeYears} years; ${housing.retrofittedCount} retrofitted (${housing.retrofittedPercent}%).`:''].filter(Boolean).join(' ');
   }
-  $('world-map').hidden = true;
-  if(value) void catalogSources.then(sources=>{
-    const source=sources.find(source=>source.id===value.sourceId&&source.sourceRevision===value.sourceRevision&&source.snapshotSha256===value.snapshotSha256);
-    if(status?.id!==value.id||!source?.preview)return;
-    $('world-map-image').src=source.previewSmall||source.preview;
-    $('world-map-image').alt=`${source.name} · pinned town illustration`;
-    $('world-map-caption').textContent=`${source.name} · ${source.homes} homes · ${source.premises} premises. This illustration belongs to your saved world's map revision.`;
-    $('world-map').hidden=false;
-  });
   $('name').textContent = value?.name || 'Open a simulation';
   const option=[...$('world').options].find(option=>option.value===value?.id);
   if(option)option.textContent=`${value.name}${value.available?' · '+value.through:' · unavailable'}`;
@@ -96,7 +88,7 @@ async function loadWorld(id) {
   clearTimeout(pollTimer); pollRemaining = 0;
   events.clear();
   sentiment.clear();
-  premises.clear();
+  premises.clear();map.clear();
   connected.clear(); connectedStatus = null; connectedCommands = null; connectedActor = null; canControl = false;
   reading = true; render(null); controls();
   try {
@@ -112,7 +104,7 @@ async function loadWorld(id) {
       } catch (error) { canControl = false; message(error.message); }
       try { connectedStatus = await request('connected',{id}); render(value); } catch (error) { message(error.message); }
     }
-    if (value.available) {await events.load(value);await sentiment.load(value);await premises.load(value);}
+    if (value.available) {await events.load(value);await sentiment.load(value);await premises.load(value);await map.load(value);}
     const url = new URL(location.href); url.searchParams.set('id', id); history.replaceState(null, '', url);
     if (!value.available) message(value.error || 'Saved world is unavailable.');
     else if (!clockIsManaged(value)) message('Saved physical world loaded. Virtual Systems is not required.');
