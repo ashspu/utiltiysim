@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {hostedWelcome} from './hosted_welcome.mjs';
+import {verifyReviewedMap} from './reviewed_map_assets.mjs';
 const repo = fileURLToPath(new URL('../', import.meta.url));
 const out = path.join(repo, 'public');
 const web = path.join(repo, 'prototypes/civic-atlas/web');
@@ -11,8 +12,9 @@ const catalog = JSON.parse(fs.readFileSync(path.join(web, 'presets/catalog.json'
 const townIds = new Set(catalog.presets.map(p => p.id));
 const presetFiles = new Set(['tiles.json', 'premise-index.json', 'landmarks.json', 'overview.webp', 'overview.json', 'geometry-overview.webp']);
 const shellFiles = new Set(['library.html', 'library.js', 'library.css', 'world-builder.js', 'virtual-systems.js', 'landing.js', 'landing.css', 'shell-session.js', 'style.css', 'welcome.css', 'welcome.js']);
-for (const file of ['workspace.html','workspace.js','workspace.css','workspace-start-state.mjs']) shellFiles.add(file);
-for (const file of ['physical-slider-form.mjs','physical-slider-form.css']) shellFiles.add(file);
+for (const file of ['workspace.html','workspace.js','workspace.css','workspace-start-state.mjs','workspace-library-state.mjs']) shellFiles.add(file);
+for (const file of ['settings-concepts.html','settings-concepts.css','settings-concepts.js']) shellFiles.add(file);
+for (const file of ['physical-slider-form.mjs','physical-slider-form.css','physical-mix-control.mjs']) shellFiles.add(file);
 for (const file of ['compute-connection.html','compute-connection.js','compute-connection.css','world-control.html','world-control.js','world-control.css','world-control-core.mjs','world-control-events.mjs','world-control-sentiment.mjs','world-control-connected.mjs','world-control-connected-state.mjs','world-control-connected-view.mjs']) shellFiles.add(file);
 for (const file of ['world-control-premises.mjs','vs-operator.html','vs-operator.js','vs-operator.css','vs-operator-core.mjs']) shellFiles.add(file);
 shellFiles.add('world-control-map.mjs');
@@ -65,10 +67,9 @@ fs.cpSync(web, out, {recursive: true, filter(source) {
   return relative.length === 2 || relative[2] === 'tiles' || presetFiles.has(relative[2]) || relative[2] === 'setup-preview.jpg';
 }});
 const explore=path.join(web,'presets/lantern-bay-500/explore');
-const proof=JSON.parse(fs.readFileSync(path.join(explore,'manifest.json'),'utf8'));
-const {createHash}=await import('node:crypto');
-for(const [file,digest] of Object.entries(proof.files)){if(file.includes('..')||createHash('sha256').update(fs.readFileSync(path.join(explore,file))).digest('hex')!==digest)throw Error('Reviewed map asset changed: '+file);}
-fs.cpSync(explore,path.join(out,'presets/lantern-bay-500/explore'),{recursive:true});
+const proof=verifyReviewedMap(explore),exploreOut=path.join(out,'presets/lantern-bay-500/explore');
+fs.mkdirSync(path.join(exploreOut,'panels'),{recursive:true});
+for(const file of ['manifest.json',...Object.keys(proof.files)])fs.copyFileSync(path.join(explore,file),path.join(exploreOut,file));
 fs.writeFileSync(path.join(out, 'index.html'), welcomeHtml);
 // Only the hosted build uses WorkOS. The offline launcher retains its own runtime boundary.
 for (const file of ['index.html', 'library.html', 'workspace.html']) {

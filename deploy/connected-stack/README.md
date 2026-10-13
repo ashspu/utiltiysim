@@ -4,6 +4,13 @@ This package prepares provider-neutral infrastructure for UtilitySim B. Greg sel
 
 ## Current readiness
 
+The optional operator startup followup is documented in [OPERATOR.md](OPERATOR.md).
+It keeps the same controller process, shared clock and stopped-owner recovery;
+it adds a distinct server capability and protected CLI token file. Its portable
+checks pass alongside the original deployment checks (22 total). The evidence
+below records the earlier core acceptance and must retain its original source
+pins; use approved successor commits and actual image digests for live operation.
+
 - Public base is main `60283b932b039b5a47032c97850fd422d74a8826`. The latest local acceptance used published producer `3ffcc40c440f425cecdae37e7fd7f4c6537caf85` and private VS `de78127334098e980389169761ba18b4687d7db5`; source file hashes are recorded in the acceptance report. These are source candidates, not deploy-ready images. Use reviewed integrated successors and real image digests for deployment.
 - Producer owner supplies Docker packaging and `/hosted`/fixed-world `/machine` runtime. Private VS supplies the actual connected serve/status/backup-ready CLI. `owners.py` adapts these interfaces without modifying owner modules. Current VS control service binds `127.0.0.1:8027`, `GET /connected`, `POST /connected/commands`; command acceptance is asynchronous and is not an idle barrier.
 - `compose.json` is JSON-form YAML; portable tests parse its structure and the fetched official Compose draft2020-12 JSON schema validates it. Local tests exercise configuration rejection and genuine SQLite archive/hash/cursor recovery. No Docker daemon, Caddy binary, age binary or Linux volume was available here; no container boot, TLS handshake, encrypted-backup execution or cloud restore is claimed.

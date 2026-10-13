@@ -1,7 +1,7 @@
 import { WorkOS } from '@workos-inc/node';
 import { config, identity, reply, sameOrigin } from '../server/auth.mjs';
 import { grantsFor, permits } from '../server/permissions.mjs';
-import { catalog, validateSetup, draftStore, publicSetup } from '../server/setup-drafts.mjs';
+import { catalog, validateSetup, validateSetupAction, draftStore, publicSetup } from '../server/setup-drafts.mjs';
 import { setupStorageConfigured } from '../server/setup-storage.mjs';
 
 export function createSetupsHandler({env=process.env, client=cfg=>new WorkOS(cfg.apiKey,{clientId:cfg.clientId}), store=()=>draftStore(env)}={}) {
@@ -20,15 +20,27 @@ export function createSetupsHandler({env=process.env, client=cfg=>new WorkOS(cfg
           setupStorageConfigured:setupStorageConfigured(env), runtimeConfigured:false});
       }
       if (req.method === 'GET') {
-        const setups = (await store().list(auth.user.id)).filter(s=>permits(grants,'world.view',s.grantTownId)).map(publicSetup);
+        const trash=url.searchParams.get('view')==='trash';
+        if (trash&&!grants.some(g=>g.role==='owner')) return reply(res,403,{detail:'Owner access is required to restore saved setups.'});
+        const setups = (await store().list(auth.user.id,{trash})).filter(s=>trash
+          ? grants.some(g=>g.role==='owner'&&(g.town==='*'||g.town===s.grantTownId))
+          : permits(grants,'world.view',s.grantTownId)).map(publicSetup);
         return reply(res,200,{setups});
       }
       if (Buffer.byteLength(JSON.stringify(req.body||{})) > 16384) return reply(res,413,{detail:'Setup request is too large.'});
+      if (Object.hasOwn(req.body||{},'action')) {
+        const input=validateSetupAction(req.body),storage=store();
+        if (!grants.some(g=>g.role==='owner')) return reply(res,403,{detail:'Owner access is required to delete or restore setups.'});
+        const current=await storage.get(auth.user.id,input.id);
+        if (!current) return reply(res,404,{detail:'Saved setup was not found.'});
+        if (!grants.some(g=>g.role==='owner'&&(g.town==='*'||g.town===current.grantTownId))) return reply(res,403,{detail:'Owner access to this town is required.'});
+        return reply(res,200,{setup:publicSetup(await storage.transition(auth.user.id,input,current.grantTownId))});
+      }
       const input = validateSetup(req.body);
       if (!grants.some(g=>g.role==='owner'&&(g.town==='*'||g.town===input.grantTownId))) return reply(res,403,{detail:'Owner access is required to save this town setup.'});
       return reply(res,200,{setup:publicSetup(await store().save(auth.user.id,input))});
     } catch (error) {
-      if (![409,422].includes(error.status)) {
+      if (![404,409,422].includes(error.status)) {
         // Categorize infrastructure failures without logging credentials, URLs,
         // setup bodies, or provider error text.
         const message = String(error.message || '').toLowerCase();
@@ -41,7 +53,7 @@ export function createSetupsHandler({env=process.env, client=cfg=>new WorkOS(cfg
           : 'storage-unclassified';
         console.error('setup-storage-failure', category, ['TypeError','SyntaxError','UpstashError','Error'].includes(error.name) ? error.name : 'ProviderError');
       }
-      return reply(res,[409,422].includes(error.status)?error.status:503,{detail:[409,422].includes(error.status)?error.message:'Online setup storage is unavailable. Your unsaved values are still on this page; try saving again.'});
+      return reply(res,[404,409,422].includes(error.status)?error.status:503,{detail:[404,409,422].includes(error.status)?error.message:'Online setup storage is unavailable. No save, delete or restore has been confirmed. Retain your request and retry it unchanged.'});
     }
   };
 }

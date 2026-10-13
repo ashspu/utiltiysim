@@ -52,10 +52,10 @@ def identity(cfg, status):
 
 
 @contextmanager
-def service_token_file(cfg):
+def service_token_file(cfg, variable=None):
     with tempfile.TemporaryDirectory(prefix="connected-service-") as temporary:
         token_file = Path(temporary) / "service.token"
-        token_file.write_text(os.environ[cfg["ownerCli"]["serviceTokenEnv"]], encoding="utf-8")
+        token_file.write_text(os.environ[variable or cfg["ownerCli"]["serviceTokenEnv"]], encoding="utf-8")
         os.chmod(token_file, 0o600)
         yield token_file
 
@@ -74,8 +74,18 @@ def serve(cfg):
     from connected.__main__ import main as owner_main
     item = cfg["ownerCli"]
     with service_token_file(cfg) as token_file:
-        return owner_main(["serve", "--directory", item["directory"], "--remote-config", item["remoteConfig"],
-                           "--service-token-file", str(token_file), "--port", str(item["port"])])
+        command = ["serve", "--directory", item["directory"], "--remote-config", item["remoteConfig"],
+                   "--service-token-file", str(token_file), "--port", str(item["port"])]
+        if cfg.get("operatorEnabled", False):
+            token = os.environ.get("CONNECTED_OPERATOR_TOKEN")
+            require(isinstance(token, str) and 32 <= len(token) <= 4096
+                    and all(33 <= ord(char) <= 126 for char in token)
+                    and token not in (os.environ.get(item["serviceTokenEnv"]),
+                                      os.environ.get(item["clockTokenEnv"])),
+                    "Use a dedicated bounded operator capability.")
+            with service_token_file(cfg, "CONNECTED_OPERATOR_TOKEN") as operator_file:
+                return owner_main(command + ["--operator-token-file", str(operator_file)])
+        return owner_main(command)
 
 
 def pause(cfg, timeout=90):

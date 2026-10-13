@@ -4,7 +4,7 @@ import { grantsFor, permits } from '../server/permissions.mjs';
 import { catalog } from '../server/setup-drafts.mjs';
 import { fail, connectionStore, publicConnection, unsealCredential, runtimeRequest } from '../server/compute-connector.mjs';
 import { managedClock, validateConnectedCommand, publicConnectedStatus, publicConnectedReceipt } from '../server/connected-control.mjs';
-import { publicCity } from '../server/city-projection.mjs';
+import { publicCity,CITY_UPSTREAM_MAX_BYTES } from '../server/city-projection.mjs';
 import { publicMapBindings } from '../server/map-projection.mjs';
 import { premiseQuery, publicPremises } from '../server/premise-projection.mjs';
 const worldId=/^[0-9a-f]{32}$/;
@@ -37,8 +37,14 @@ export function createComputeHandler({env=process.env,client=cfg=>new WorkOS(cfg
     const world=status.data, source=catalog.sources.find(s=>s.id===world.sourceId);
     if(!source||world.sourceRevision!==source.sourceRevision||world.grantTownId!==source.grantTownId)fail(409,'World source revision is not supported by this shell.');
     if(!permits(grants,(action==='advance'||action==='connected-command'||['storms','sentiment'].includes(action)&&req.method==='POST')?'world.advance':'world.view',source.grantTownId))fail(403,'Current world permission required.');
-    if(action==='city'){if(url.searchParams.getAll('id').length!==1)fail(422,'Choose one world.');const result=await invoke('/hosted/worlds/'+id+'/map/snapshot','GET',undefined,{maxBytes:12000000});if(result.status!==200)return reply(res,result.status,{detail:'Saved city unavailable.'});return reply(res,200,publicCity(result.data,world));}
-    if(action==='map'){if(url.searchParams.getAll('id').length!==1)fail(422,'Choose one world.');const result=await invoke('/hosted/worlds/'+id+'/map/bindings');if(result.status!==200)return reply(res,result.status,{detail:'Saved map unavailable.'});return reply(res,200,publicMapBindings(result.data,world));}
+    if(['city','map'].includes(action)){
+      if([...url.searchParams.keys()].some(key=>!['action','id'].includes(key)||url.searchParams.getAll(key).length!==1))fail(422,'Choose one saved world.');
+      if(world.id!==id)fail(502,'The selected world was not confirmed.');
+      if(world.available!==true)fail(409,'The selected world is not available.');
+      const result=action==='city'?await invoke('/hosted/worlds/'+id+'/map/snapshot','GET',undefined,{maxBytes:CITY_UPSTREAM_MAX_BYTES}):await invoke('/hosted/worlds/'+id+'/map/bindings');
+      if(result.status!==200)return reply(res,result.status,{detail:action==='city'?'Saved city unavailable.':'Saved map unavailable.'});
+      return reply(res,200,action==='city'?publicCity(result.data,world):publicMapBindings(result.data,world));
+    }
     if(['premises','premise'].includes(action)) {
       const query=premiseQuery(url,action);if(world.id!==id)fail(502,'The selected world was not confirmed.');
       const result=await invoke('/hosted/worlds/'+id+'/premises'+(action==='premise'?'/'+encodeURIComponent(query.premiseId)+'/summary':`?offset=${query.offset}&limit=${query.limit}`));

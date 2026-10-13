@@ -1,5 +1,10 @@
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const safeOperatorId=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(value);
+// Browser proof hashes use sorted, well-formed JavaScript JSON UTF-8. This is
+// deliberately different from the private trusted-request ensure_ascii hash.
+export function canonicalOperatorRequest(body){return JSON.stringify(Object.fromEntries(Object.keys(body).sort().map(key=>[key,body[key]])));}
+export async function operatorRequestHash(body){const bytes=new TextEncoder().encode(canonicalOperatorRequest(body));const digest=await globalThis.crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');}
+export async function permanentOperatorRejection(error,body){const proof=error?.rejection,expected={'release-read':404,invoice:403,'retry-job':403}[body.action];if(expected===undefined||error?.status!==expected||!proof||typeof proof!=='object'||Array.isArray(proof)||Object.keys(proof).length!==4||Object.keys(proof).some(key=>!['commandId','requestHash','status','disposition'].includes(key))||proof.status!==expected||proof.commandId!==body.commandId||proof.disposition!=='permanently-rejected'||typeof proof.requestHash!=='string'||!/^[a-f0-9]{64}$/.test(proof.requestHash))return false;return proof.requestHash===await operatorRequestHash(body);}
 const required={ 'release-read':['exceptionId','note'],bill:['cycleId','contractId'],invoice:['cycleId','accountId'],'retry-job':['jobId'] };
 function validateCommand(body){
   const fields=required[body?.action];
@@ -33,5 +38,5 @@ export class OperatorCommandState{
     // If this write or removal fails, its exact request remains recoverable.
     this.storage.setItem(this.receiptKey,JSON.stringify(saved));this.lastReceipt=structuredClone(saved);
     this.storage.removeItem(this.key);this.pending=null;
-  }else this.pending=current;return receipt;}finally{this.busy=false;}}
+  }else this.pending=current;return receipt;}catch(error){if(await permanentOperatorRejection(error,body)){const current=this.read();if(current?.commandId===body.commandId&&canonicalOperatorRequest(current)===canonicalOperatorRequest(body)){this.storage.removeItem(this.key);this.pending=null;error.permanentlyRejected=true;}else this.pending=current;}throw error;}finally{this.busy=false;}}
 }

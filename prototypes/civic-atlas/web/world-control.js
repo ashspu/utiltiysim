@@ -70,7 +70,8 @@ function render(value) {
   $('name').textContent = value?.name || 'Open a simulation';
   const option=[...$('world').options].find(option=>option.value===value?.id);
   if(option)option.textContent=`${value.name}${value.available?' · '+value.through:' · unavailable'}`;
-  $('open-city').href=value?'/city.html?id='+value.id:'/workspace.html';
+  $('open-city').hidden=value?.available!==true;
+  $('open-city').href=value?.available?'/city.html?id='+value.id:'/workspace.html';
   $('identity').textContent = value?.id || '—';
   $('revision').textContent = value?.sourceRevision || '—';
   $('state').textContent = value ? `${value.state || 'Unknown'}${value.available ? '' : ' · unavailable'}` : 'Unknown';

@@ -215,6 +215,43 @@ Positive trustChange improves confidence; negative values reduce it, bounded to 
 
 Sentiment, contact decisions, news application and the physical day checkpoint commit atomically. Tests cover no future/hidden knowledge, late delivery versus late learning, bounds, restored/quiet recovery, cohort resets, unchanged opt-out physics/contact contracts, rollback/restart, event idempotency, cancellation, auth, immutable inspection and independent pagination. Full accepted-map HTTP/restart proof covers 300 occupied households and one exactly-once scheduled news impulse; separate real-fault tests prove actual repeat-contact amplification.
 
+## Scoped commercial operator transport
+
+`POST /hosted/worlds/{id}/operator` accepts exactly `{action,premiseId,...actionFields}`. The browser cannot supply `actor`, schema/version, capabilities, upstream credentials, URLs or route paths. Actions and extra fields are:
+
+| Action | Extra fields | Permission | Successful status |
+| --- | --- | --- | --- |
+| `premise` | none | billing.view | 200 |
+| `job` | jobId | billing.view | 200 |
+| `release-read` | commandId, exceptionId, note | billing.view + billing.run | 200 |
+| `bill` | commandId, cycleId, contractId | billing.view + billing.run | 202 |
+| `invoice` | commandId, cycleId, accountId | billing.view + billing.run | 202 |
+| `retry-job` | commandId, jobId | billing.view + billing.run | 202 |
+
+Identifiers and notes are nonblank strings up to 200 characters; mutation command IDs are canonical UUIDs. The producer derives the actor subject from the verified gateway principal and capabilities from its current, unrevoked, unexpired grants for the owned world's grant town. Owner/operator/billing/support/analyst can view; only owner/billing can run commercial actions. World advance permission does not authorize billing mutations. The premise must occur in this world's saved physical bindings before any outbound request.
+
+Configure a distinct 32–4096 character printable ASCII `UTILITYSIM_OPERATOR_TOKEN` or `UTILITYSIM_OPERATOR_TOKEN_FILE` (never both). It must differ from gateway, machine and controller credentials. It uses the existing fixed controller origin and transport policy, never a new browser-selected service. Omitting it leaves the route unavailable. The literal private path is `/connected/operator`, with `connected-operator-request/1`, the derived actor, and fixed run/controller headers. No browser Origin, cookies or authorization headers are forwarded. Outbound request size is at most 4096 bytes; the entire response has a 15-second deadline and 2,000,000-byte bound. Redirects are never followed.
+
+The private response must be `connected-operator-response/1` with the exact matching run, controller, physical premise, action and original command ID (null for reads). The premise projection permits only physicalPremiseId and accounts/premises/contracts/installations/reads/bills/invoices/exceptions/cycles/receivables; each collection is at most 200 row objects. There is no jobs array. Job actions validate the scoped job ID, instance, type/status and cycle as applicable. Release reports an actual resolved result. Typed, scoped refusal statuses 400/403/404/409/413/422/503 are preserved; malformed, unscoped, unexpected or unavailable replies become 503. Responses are not cached.
+
+202 preserves the original queued job receipt; it is not evidence of a completed bill, invoice or ledger posting. Poll `job` with that actual job ID. The producer never retries a mutation automatically, generates a replacement UUID or labels uncertain transport failure as authoritative nonacceptance. Retry the retained exact request. Billing owns physical-to-commercial account mapping, ambiguity refusal, shared clock and held-lease checks, domain validation and atomic command/event replay; no enterprise database is read locally by the producer.
+
+For a bounded selector, `GET /hosted/worlds/{id}/premises?offset=0&limit=50` returns `{worldId,sourceRevision,total,offset,premises:[{premiseId,address?,parcelId?}]}`. Offset is nonnegative; limit is 1–50; IDs sort lexically and an exhausted page is empty. `GET /hosted/worlds/{id}/premises/{premiseId}/summary` returns `{worldId,sourceRevision,premise:{premiseId,address?,parcelId?,type?,occupied}}` from saved geometry/bindings and current physical occupancy. Display text is bounded to 512 characters; operator premise IDs to 200. Unknown premises return 404. Both require current world view permission and ownership. The existing administrator detail and full map bindings remain compatible; this summary contains no assets, meter condition, physical quantities or fault truth.
+
+### Verified permanent operator refusals
+
+The existing `connected-operator-response/1` error may additionally contain exactly `rejection:{commandId,requestHash,status,disposition:'permanently-rejected'}`. Only these current action/status pairs are supported: invoice or invoicing retry-job403 when the scoped account lacks its exact pinned financial recipient, and release-read404 for an existing in-scope reading exception already resolved. An HTTP status or error text alone never proves a permanent refusal.
+
+After current gateway principal/world grant checks and fixed origin/run/controller admission, the producer validates the error envelope's run/controller/premise/action, exact proof keys, original canonical command UUID, integer HTTP status, disposition and lowercase64-character SHA256. The private requestHash must equal SHA256 of the **complete trusted request actually forwarded**, including derived actor and capabilities: Python `json.dumps(request,sort_keys=True,separators=(',',':'),allow_nan=False)` with default `ensure_ascii=True`. Unicode is escaped in that private digest.
+
+Only after this validation does the producer replace proof.requestHash with SHA256 of the **unchanged original browser request** (action/premise/command/action-specific fields). Browser canonical JSON sorts the ASCII request keys and uses ordinary well-formed JS `JSON.stringify` strings encoded as UTF8: Unicode characters stay literal, while lone UTF16 surrogates are escaped. The typed request contains string values only. Private and browser hashes are not interchangeable. No raw trusted actor/request is exposed. The shell must independently check the selected owner/premise/action/status and retained UUID/body hash before clearing its pending request.
+
+Malformed or mismatched proof becomes503 with no public rejection marker. Unmarked generic authorization403, scope404, busy409, clock503, admission413, changed content for an already-known UUID, active-cycle jobs, unsupported requests and transport errors retain uncertainty. Bill and read actions cannot carry this terminal proof. Authorization is still required for exact retries; no automatic retry, replacement UUID or inferred business completion is introduced. Private Billing owns the durable atomic refusal tombstone and replay policy; the producer validates its claim rather than storing a second business receipt.
+
+The premise result also accepts `invoiceEligibleAccountIds`: an explicit string array of at most200 distinct nonblank IDs (each≤200characters), all present in its scoped accounts. It conveys confirmed recipient eligibility only; cycle readiness and current billing permission remain separate checks. Malformed, duplicate, foreign or oversized eligibility fails closed. For an older `/1` response omitting this field, the producer explicitly projects `[]`; mapped commercial accounts alone never establish invoice eligibility. Consumers should treat this as no account confirmed eligible, not fabricate recipient bindings.
+
+Focused HTTP tests cover exact proof and trusted-body binding, altered actor/capabilities/body/owner/status/UUID, generic-error retention, current grant revocation and caller-authority refusal, lost reply/reopen/exact retry, Unicode encoding, independent Node browser digest vectors and bounded scoped eligibility. Actual private tombstone durability and fresh public gateway/page acceptance are separate owner checks required before this successor is marked ready.
+
 ## Current ownership
 
 Backend chat `01a12bf4-9f78-7411-ac48-15750ae1d151` owns `utilsim/hosted/`, its tests and `deploy/hosted-runtime/`. Shell chat `01a12acd-01bf-7801-b837-d651ab299083` owns UI, WorkOS gateway and canonical Vercel release. Coordinator `01a12759-bb9e-79b1-b1b9-32f0a5864e10` coordinates online draft storage. Standing coordination authorization: Greg, 2026-10-11, chat `01a12aa3-5c1e-7142-aad0-dd177c7c9f09`.
