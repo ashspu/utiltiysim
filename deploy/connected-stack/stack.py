@@ -52,6 +52,7 @@ def validate_config(cfg):
     require(isinstance(cfg, dict) and cfg.get("schemaVersion") == SCHEMA, "Unsupported deployment schema.")
     require(cfg.get("readiness") == "deployment-ready", "Candidate artifacts are not deployment-ready.")
     require(type(cfg.get("fieldEnabled")) is bool, "Declare whether the managed field owner is enabled.")
+    require(type(cfg.get("operatorEnabled", False)) is bool, "Declare whether the billing operator is enabled.")
     require(isinstance(cfg.get("runId"), str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", cfg["runId"]),
             "Supply the actual fixed connected run identity.")
     try:
@@ -100,6 +101,11 @@ def validate_config(cfg):
         argv(service.get("healthCommand"), role + "readiness")
     controller = services["controller"]
     mode = cfg.get("recoveryMode", "owner-hooks/1")
+    if cfg.get("operatorEnabled", False):
+        require(mode == "owner-cli-stopped/1", "Operator startup requires the reviewed connected owner CLI.")
+        require("UTILITYSIM_OPERATOR_TOKEN" in services["producer"]["requiredSecrets"]
+                and "CONNECTED_OPERATOR_TOKEN" in controller["requiredSecrets"],
+                "Declare a dedicated operator capability at both server owners.")
     require(mode in ("owner-hooks/1", "owner-cli-stopped/1"), "Unsupported recovery integration mode.")
     if mode == "owner-hooks/1":
         argv(controller.get("pauseCommand"), "controller pause")
@@ -145,6 +151,21 @@ def validate_config(cfg):
         require(identity not in paths, "Independent owners cannot alias one file.")
         paths.add(identity)
     return cfg
+
+
+def operator_secrets(cfg, values):
+    if not cfg.get("operatorEnabled", False):
+        return
+    producer, controller = values["producer"], values["controller"]
+    token = producer.get("UTILITYSIM_OPERATOR_TOKEN")
+    require(isinstance(token, str) and 32 <= len(token) <= 4096
+            and all(33 <= ord(char) <= 126 for char in token)
+            and token == controller.get("CONNECTED_OPERATOR_TOKEN"),
+            "Both servers require the same bounded printable operator capability.")
+    protected = [value for role in ROLES for key, value in values[role].items()
+                 if key not in ("UTILITYSIM_OPERATOR_TOKEN", "CONNECTED_OPERATOR_TOKEN")
+                 and any(word in key for word in ("TOKEN", "KEY", "PASSWORD", "SECRET"))]
+    require(token not in protected, "Operator capability must differ from gateway, machine, control and clock credentials.")
 
 
 def secrets(path, required):
@@ -211,8 +232,9 @@ def preflight(cfg, config_path):
     require(shutil.which("docker"), "Docker/Compose is unavailable.")
     volume(cfg)
     owner_files(cfg)
-    for role in ROLES:
-        secrets(cfg["services"][role]["secretsFile"], cfg["services"][role]["requiredSecrets"])
+    values = {role: secrets(cfg["services"][role]["secretsFile"], cfg["services"][role]["requiredSecrets"])
+              for role in ROLES}
+    operator_secrets(cfg, values)
     tls = Path(cfg["tlsDirectory"])
     key, cert = tls / "privatekey.pem", tls / "fullchain.pem"
     require(key.is_file() and cert.is_file() and key.resolve() == key.absolute() and cert.resolve() == cert.absolute(), "Supply real TLS certificate and private key without symbolic links.")
