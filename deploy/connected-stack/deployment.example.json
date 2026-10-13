@@ -13,6 +13,7 @@
   },
   "runId": null,
   "fieldEnabled": false,
+  "operatorEnabled": false,
   "volumeId": null,
   "producerHost": null,
   "dataRoot": "/srv/utilitysim-b/data",
