@@ -1,8 +1,8 @@
-// The illustrated preview is not a parcel hit-test map. This selector uses the
-// saved world's actual premise IDs and never guesses locations or commercial IDs.
+// Both the map and selector inspect saved-world premise IDs.
+// Commercial IDs and current occupancy come from the owned runtime.
 export function createPremisePanel(root,request) {
   const title=document.createElement('h2');title.textContent='Explore a premise';
-  const help=document.createElement('p');help.textContent='Choose an actual premise from this saved world. Its illustration is a preview; the premise records retain the pinned map identity.';
+  const help=document.createElement('p');help.textContent='Choose an actual premise from this saved world. Select a property on the map or choose a premise here to inspect its saved records.';
   const label=document.createElement('label');label.textContent='Premise';label.setAttribute('for','premise-selector');
   const select=document.createElement('select');select.id='premise-selector';
   const inspect=document.createElement('button');inspect.textContent='Inspect premise';
@@ -11,9 +11,9 @@ export function createPremisePanel(root,request) {
   const detail=document.createElement('dl');
   const link=document.createElement('a');link.textContent='Open Virtual Systems records';link.hidden=true;
   root.replaceChildren(title,help,label,select,inspect,more,message,detail,link);
-  let world=null,offset=0,total=0,generation=0,busy=false;
+  let world=null,offset=0,total=0,generation=0,selection=0,busy=false;
   function controls(){select.disabled=inspect.disabled=!world||busy||!select.value;more.disabled=!world||busy;more.hidden=!world||offset>=total;}
-  function clear(){generation++;world=null;offset=total=0;busy=false;select.replaceChildren();select.value='';detail.replaceChildren();link.hidden=true;link.removeAttribute?.('href');message.textContent='Open a saved simulation to select a premise.';controls();}
+  function clear(){generation++;selection++;world=null;offset=total=0;busy=false;select.replaceChildren();select.value='';detail.replaceChildren();link.hidden=true;link.removeAttribute?.('href');message.textContent='Open a saved simulation to select a premise.';controls();}
   async function page(){if(!world||busy)return;const selected=world,version=generation;busy=true;controls();try{
     const value=await request('premises',{id:selected.id,offset:String(offset),limit:'50'});
     if(version!==generation)return;
@@ -23,14 +23,15 @@ export function createPremisePanel(root,request) {
     if(!select.value&&value.premises.length)select.value=value.premises[0].premiseId;
     message.textContent=total?`${offset} of ${total} actual premises loaded.`:'This saved world has no premises.';
   }catch(error){if(version===generation)message.textContent=error.message;}finally{if(version===generation){busy=false;controls();}}}
-  async function inspectSelected(){if(!world||busy||!select.value)return;const selected=world,premiseId=select.value,version=generation;busy=true;detail.replaceChildren();link.hidden=true;controls();try{
-    const value=await request('premise',{id:selected.id,premiseId});if(version!==generation)return;
+  async function inspectSelected(fromMap=false){if(!world||busy&&!fromMap||!select.value)return false;const selected=world,premiseId=select.value,version=generation,requestVersion=++selection;busy=true;detail.replaceChildren();link.hidden=true;message.textContent='Reading the selected saved premise…';controls();try{
+    const value=await request('premise',{id:selected.id,premiseId});if(version!==generation||requestVersion!==selection)return false;
     if(value.worldId!==selected.id||value.sourceRevision!==selected.sourceRevision||value.premise?.premiseId!==premiseId)throw Error('The selected premise was not confirmed.');
     for(const [key,label]of [['premiseId','Physical premise'],['address','Address'],['parcelId','Parcel'],['type','Premise type'],['occupied','Occupied']])if(value.premise[key]!==undefined){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=String(value.premise[key]);detail.append(dt,dd);}
     const connected=selected.connectedClock?.configured===true;
     if(connected){link.href='/vs-operator.html?'+new URLSearchParams({id:selected.id,premiseId});link.hidden=false;}
     message.textContent=connected?'Premise confirmed. Virtual Systems resolves its commercial mapping and checks your current access.':'Premise confirmed. This world has no configured Virtual Systems connection.';
-  }catch(error){if(version===generation)message.textContent=error.message;}finally{if(version===generation){busy=false;controls();}}}
-  inspect.onclick=inspectSelected;more.onclick=page;select.onchange=()=>{detail.replaceChildren();link.hidden=true;};
-  clear();return {clear,async load(value){clear();if(!value?.available)return;world=value;await page();}};
+    return true;
+  }catch(error){if(version===generation&&requestVersion===selection)message.textContent=error.message;return false;}finally{if(version===generation&&requestVersion===selection){busy=false;controls();}}}
+  inspect.onclick=()=>inspectSelected();more.onclick=page;select.onchange=()=>{selection++;detail.replaceChildren();link.hidden=true;};
+  clear();return {clear,async selectPremise(id){if(!world)return false;let option=[...select.options].find(o=>o.value===id);if(!option){option=document.createElement('option');option.value=id;option.textContent=id;select.append(option);}select.value=id;return inspectSelected(true);},async load(value){clear();if(!value?.available)return;world=value;await page();}};
 }

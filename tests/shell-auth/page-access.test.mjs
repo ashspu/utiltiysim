@@ -26,6 +26,14 @@ test('forged or revoked sessions cannot unlock static maps or workspace data',as
     const result=await run(request(path,'forged'));assert.ok([303,401].includes(result.status));assert.equal(result.headers.get('x-middleware-next'),null);
   }
 });
+test('reviewed map files stay protected by current verified town grants before cache',async()=>{
+ const paths=['/presets/town-a/explore/manifest.json','/presets/town-a/explore/scene.json','/presets/town-a/explore/properties.geojson','/presets/town-a/explore/panels/11-v2.png'];
+ for(const path of paths){const good=await gate()(request(path,'valid'));assert.equal(good.headers.get('x-middleware-next'),'1');assert.equal(good.headers.get('cache-control'),'private, no-store');assert.equal(good.headers.get('vercel-cdn-cache-control'),'no-store');
+  for(const run of [gate({verified:false}),gate({granted:false})])assert.equal((await run(request(path,'valid'))).status,403);
+  assert.equal((await gate()(request(path))).status,401);assert.equal((await gate()(request(path.replace('town-a','town-b'),'valid'))).status,403);
+ }
+ for(const run of [gate({verified:false}),gate({granted:false})])assert.equal((await run(request('/city.html?id='+ 'a'.repeat(32),'valid'))).status,403);
+});
 test('authenticated static requests enforce verified, current, town-scoped grants before cache',async()=>{
   const run=gate();
   for(const path of ['/library.html?town=town-a','/presets/shared/tiled-map.html?preset=town-a','/presets/town-a/tiles/1-1.json']) {
@@ -36,6 +44,24 @@ test('authenticated static requests enforce verified, current, town-scoped grant
     assert.equal((await run(request('/workspace.html','valid'))).headers.get('x-middleware-next'),'1');
     for(const path of ['/library.html?town=town-a','/presets/catalog.json','/viewer/']) assert.equal((await run(request(path,'valid'))).status,403,path);
   }
+});
+test('workspace dependencies load for signed-in users before a town grant exists',async()=>{
+  const page=fs.readFileSync(new URL('../../prototypes/civic-atlas/web/workspace.html',import.meta.url),'utf8');
+  const script=fs.readFileSync(new URL('../../prototypes/civic-atlas/web/workspace.js',import.meta.url),'utf8');
+  const assets=[...page.matchAll(/<(?:link|script)\b[^>]*(?:href|src)="([^"]+)"/g)].map(m=>m[1]);
+  assets.push(...[...script.matchAll(/^import .* from '\.\/([^']+)'/gm)].map(m=>'/'+m[1]));
+  assets.push('/workspace-library-state.mjs','/physical-mix-control.mjs');
+  for(const run of [gate({granted:false}),gate({verified:false})]) {
+    for(const path of assets)for(const method of ['GET','HEAD']) {
+      const response=await run(request(path,'valid',method));
+      assert.equal(response.headers.get('x-middleware-next'),'1',path);
+      assert.equal(response.headers.get('cache-control'),'private, no-store',path);
+    }
+    for(const path of ['/presets/catalog.json','/viewer/','/viewer/setup.js','/physical-slider-form.mjs/extra','/workspace-library-state.mjs/extra','/physical-mix-control.mjs/extra','/compute-connection.html']) {
+      assert.equal((await run(request(path,'valid'))).status,403,path);
+    }
+  }
+  for(const path of assets)assert.equal((await gate()(request(path))).status,401,path);
 });
 test('entry never chooses a default town and rejects ambiguous town requests',async()=>{
   const run=gate();

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPremisePanel} from '../../prototypes/civic-atlas/web/world-control-premises.mjs';
-class Node{constructor(tag){this.tag=tag;this.children=[];this.attributes={};this.value='';}append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=[...nodes];}setAttribute(key,value){this.attributes[key]=value;}removeAttribute(key){delete this[key];}async click(){if(!this.disabled)await this.onclick?.();}}
+class Node{constructor(tag){this.tag=tag;this.children=[];this.attributes={};this.value='';}get options(){return this.children;}append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=[...nodes];}setAttribute(key,value){this.attributes[key]=value;}removeAttribute(key){delete this[key];}async click(){if(!this.disabled)await this.onclick?.();}}
 const a={id:'a'.repeat(32),sourceRevision:'1'.repeat(64),available:true,connectedClock:{configured:true}},b={...a,id:'b'.repeat(32)};
 async function harness(run){const saved=Object.getOwnPropertyDescriptor(globalThis,'document');Object.defineProperty(globalThis,'document',{configurable:true,value:{createElement:tag=>new Node(tag)}});try{await run(new Node('section'));}finally{if(saved)Object.defineProperty(globalThis,'document',saved);else delete globalThis.document;}}
 test('selector inspects actual physical ID and links same saved instance, without derived commercial IDs',async()=>harness(async root=>{
@@ -11,4 +11,8 @@ test('selector inspects actual physical ID and links same saved instance, withou
 test('late response for old world cannot populate new selection or link',async()=>harness(async root=>{
  let release;const gate=new Promise(resolve=>{release=resolve;});const panel=createPremisePanel(root,async(action,args)=>{if(args.id===a.id){await gate;return {worldId:a.id,sourceRevision:a.sourceRevision,total:1,premises:[{premiseId:'old'}]};}return {worldId:b.id,sourceRevision:b.sourceRevision,total:1,premises:[{premiseId:'new'}]};});
  const old=panel.load(a);await panel.load(b);release();await old;assert.deepEqual(root.children[3].children.map(node=>node.value),['new']);assert.equal(root.children[8].hidden,true);
+}));
+test('rapid map selection commits only the latest confirmed premise and operator link',async()=>harness(async root=>{
+ let release;const first=new Promise(resolve=>{release=resolve;});const panel=createPremisePanel(root,async(action,args)=>{if(action==='premises')return{worldId:a.id,sourceRevision:a.sourceRevision,total:0,premises:[]};if(args.premiseId==='first')await first;return{worldId:a.id,sourceRevision:a.sourceRevision,premise:{premiseId:args.premiseId}};});
+ await panel.load(a);const old=panel.selectPremise('first');assert.equal(await panel.selectPremise('second'),true);release();assert.equal(await old,false);assert.equal(root.children[3].value,'second');assert.equal(root.children[7].children[1].textContent,'second');assert.equal(root.children[8].href,`/vs-operator.html?id=${a.id}&premiseId=second`);
 }));
