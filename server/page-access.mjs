@@ -12,7 +12,8 @@ const publicPaths = new Set(['/', '/index.html', '/landing.js', '/landing.css', 
 // Only its exact static dependencies belong here; maps and owner controls keep
 // their independent grant checks below.
 const signedInPaths = new Set(['/workspace.html','/workspace.js','/workspace.css','/shell-session.js',
-  '/viewer/setup.css','/physical-slider-form.css','/physical-slider-form.mjs','/workspace-start-state.mjs']);
+  '/viewer/setup.css','/physical-slider-form.css','/physical-slider-form.mjs','/workspace-start-state.mjs',
+  '/workspace-library-state.mjs','/physical-mix-control.mjs']);
 const townId = /^[a-z0-9][a-z0-9-]{0,99}$/;
 export function createPageAccess({ env = process.env, client = cfg => new WorkOS(cfg.apiKey, { clientId: cfg.clientId }), pass = next } = {}) {
   return async function pageAccess(request) {

@@ -1,5 +1,14 @@
 const NS='http://www.w3.org/2000/svg';
 export const SOURCE='62bd251fba957150799feed2743b5026da6d4dcac1bdb839231ea0c2be64a4f0';
+const MANIFEST='2d0fc16bad61463ab7a2471e46fcb629d68ab0a40cf7534110d0d701070be6c4';
+export async function fetchReviewedMap(base,fetcher=fetch){
+  const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');
+  const get=async(file,expected)=>{const r=await fetcher(base+file,{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw Error('The reviewed map could not be loaded.');const bytes=await r.arrayBuffer();if(await digest(bytes)!==expected)throw Error('Reviewed map asset changed: '+file);return bytes;};
+  const proof=JSON.parse(new TextDecoder().decode(await get('manifest.json',MANIFEST)));
+  if(proof.sourceRevision!==SOURCE||Object.keys(proof.files).length!==11)throw Error('The reviewed map source was not confirmed.');
+  const files=new Map(await Promise.all(Object.entries(proof.files).map(async([file,hash])=>[file,await get(file,hash)])));
+  return {scene:JSON.parse(new TextDecoder().decode(files.get('scene.json'))),geometry:JSON.parse(new TextDecoder().decode(files.get('properties.geojson'))),files};
+}
 export function parcelPaths(features,bindings){
   const ids=new Map(bindings.map(b=>[b.parcelId,b.premiseId]));
   if(ids.size!==bindings.length||features.length!==bindings.length)throw Error('Map properties do not match the saved world.');
@@ -14,7 +23,7 @@ const make=(tag,text)=>{const n=document.createElement(tag);if(text)n.textConten
 const svgNode=(tag,attrs={})=>{const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,String(v));return n;};
 // Preserve the approved scene compositor: feather contexts, then restore each
 // property from its owner panel using the exact global polygon.
-export function renderReviewedArtwork(canvas,defs,scene,features,paths,base){
+export function renderReviewedArtwork(canvas,defs,scene,features,paths,base,images=new Map()){
   const [bx,by,bw,bh]=scene.viewBox;
   canvas.append(svgNode('rect',{x:bx,y:by,width:bw,height:bh,fill:'#6797a5'}));
   const artwork=svgNode('g'),parcelArtwork=svgNode('g');canvas.append(artwork,parcelArtwork);
@@ -29,22 +38,22 @@ export function renderReviewedArtwork(canvas,defs,scene,features,paths,base){
     }
     const mx=svgNode('mask',{id:id+'mx',maskUnits:'userSpaceOnUse',x,y,width:w,height:h});mx.append(svgNode('rect',{x,y,width:w,height:h,fill:`url(#${id}x)`}));defs.append(mx);
     const mask=svgNode('mask',{id,maskUnits:'userSpaceOnUse',x,y,width:w,height:h});mask.append(svgNode('rect',{x,y,width:w,height:h,fill:`url(#${id}y)`,mask:`url(#${id}mx)`}));defs.append(mask);
-    const image=attrs=>svgNode('image',{href:base+panel.image,x,y,width:w,height:h,preserveAspectRatio:'none',...attrs});artwork.append(image({mask:`url(#${id})`,'data-panel':panel.id}));
+    const image=attrs=>svgNode('image',{href:images.get(panel.image)||base+panel.image,x,y,width:w,height:h,preserveAspectRatio:'none',...attrs});artwork.append(image({mask:`url(#${id})`,'data-panel':panel.id}));
     const clip=svgNode('clipPath',{id:'map-owned-'+panel.id,clipPathUnits:'userSpaceOnUse'});
     for(const f of features.filter(f=>String(f.properties?.panelId)===String(panel.id)&&f.properties?.kind!=='unresolved_zoning_area'))clip.append(svgNode('path',{d:byId.get(f.id||f.properties.id).d,'clip-rule':'evenodd'}));
     defs.append(clip);parcelArtwork.append(image({'clip-path':`url(#map-owned-${panel.id})`}));
   }
 }
 export function createWorldMap(root,request,selectPremise){
-  let generation=0,selection=0,world=null,selected=null;
-  function clear(){generation++;selection++;world=null;selected=null;root.replaceChildren();root.hidden=true;}
+  let generation=0,selection=0,world=null,selected=null,imageURLs=[];
+  function clear(){generation++;selection++;world=null;selected=null;for(const url of imageURLs)URL.revokeObjectURL(url);imageURLs=[];root.replaceChildren();root.hidden=true;}
   async function load(value){clear();if(!value?.available)return;world=value;const version=generation;root.hidden=false;root.append(make('p','Opening your saved town map…'));
     try{
       if(value.sourceRevision!==SOURCE||value.sourceId!=='lantern-harbour')throw Error('This town has no reviewed interactive map.');
       const base='/presets/lantern-bay-500/explore/';
-      const get=async file=>{const r=await fetch(base+file,{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw Error('The reviewed map could not be loaded.');return r.json();};
-      const [scene,geometry,bindings]=await Promise.all([get('scene.json'),get('properties.geojson'),request('map',{id:value.id})]);
+      const [reviewed,bindings]=await Promise.all([fetchReviewedMap(base),request('map',{id:value.id})]);
       if(version!==generation)return;
+      const {scene,geometry,files}=reviewed;
       if(bindings.worldId!==value.id||bindings.sourceRevision!==value.sourceRevision)throw Error('Map belongs to another saved world.');
       const paths=parcelPaths(geometry.features,bindings.premises),full=scene.viewBox;
       if(full?.length!==4||full.some(n=>!Number.isFinite(n))||full[2]<=0||full[3]<=0)throw Error('Invalid reviewed map bounds.');
@@ -52,7 +61,8 @@ export function createWorldMap(root,request,selectPremise){
       const help=make('p','Scroll to zoom, drag to move, and click a property to inspect it. Keyboard: focus a property and press Enter.');help.className='map-help';
       const canvas=svgNode('svg',{viewBox:full.join(' '),role:'group','aria-label':'Explore Lantern Harbour properties',tabindex:'0'});canvas.classList.add('explore-map');
       const defs=svgNode('defs');canvas.append(defs);
-      renderReviewedArtwork(canvas,defs,scene,geometry.features,paths,base);
+      const images=new Map(scene.panels.map(panel=>{const url=URL.createObjectURL(new Blob([files.get(panel.image)],{type:'image/png'}));imageURLs.push(url);return [panel.image,url];}));
+      renderReviewedArtwork(canvas,defs,scene,geometry.features,paths,base,images);
       const parcels=svgNode('g');parcels.classList.add('map-parcels');canvas.append(parcels);const notice=make('p',`${paths.length} properties linked to this saved world.`);notice.setAttribute('role','status');
       let view=[...full],drag=null,suppress=false;
       const paint=()=>canvas.setAttribute('viewBox',view.join(' '));
